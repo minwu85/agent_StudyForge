@@ -6,6 +6,11 @@ There are no migrations yet (see docs/backend.md) — this script drops and recr
 tables on every run, so it is destructive to any existing local data.
 """
 
+import shutil
+
+from sqlalchemy import text
+
+from app.config import settings
 from app.database.connection import Base, SessionLocal, engine
 from app.models.course import Course, Week
 from app.models.question import AnswerOption, Difficulty, Question
@@ -380,8 +385,15 @@ SAMPLE_QUESTIONS = [
 
 
 def seed():
+    with engine.begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+
+    # dropping the `documents` table orphans any uploaded files on disk; clear them too so
+    # storage stays in sync with the (now-empty) documents table.
+    shutil.rmtree(settings.storage_dir, ignore_errors=True)
     db = SessionLocal()
     try:
         course = Course(

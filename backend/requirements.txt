@@ -5,3 +5,7 @@ psycopg[binary]==3.2.3
 pydantic==2.10.4
 pydantic-settings==2.7.1
 python-dotenv==1.0.1
+python-multipart==0.0.20
+pypdf==5.1.0
+pgvector==0.3.6
+sentence-transformers==3.3.1

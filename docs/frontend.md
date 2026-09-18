@@ -1,8 +1,9 @@
 # Frontend
 
 React + TypeScript, built with Vite. This document describes what is actually implemented today
-(Phase 1 MVP + Phase 2 question database — see [roadmap.md](roadmap.md) for the full long-term
-plan).
+(Phase 1 MVP + Phase 2 question database + Phase 3 document pipeline — see
+[roadmap.md](roadmap.md) for the full long-term plan, and [progress.md](progress.md) for the
+phase-by-phase build log).
 
 ## Stack
 
@@ -13,19 +14,19 @@ plan).
 - **Tailwind CSS v4** (via `@tailwindcss/vite`, no `tailwind.config.js` needed) — styling
 - **Axios** — HTTP client, wrapped in `services/api.ts`
 
-## Pages (Phase 1)
+## Pages
 
 ```text
 /               Home         Landing page, links to quiz setup
+/documents      Documents    Upload PDFs, see processing status, semantic-search across them
 /quiz/setup     QuizSetup    Pick weeks, topic, difficulty, question count, time limit → creates a quiz
 /quiz/:quizId   Quiz         Exam-taking UI: timer, question nav grid, flagging, submit
 /results/:id    Results      Score summary + optional per-question review
 ```
 
-`Review`, `History`, `Study`, `Documents`, `Progress`, `Settings` from the full roadmap don't
-exist yet — they depend on document upload, RAG, agents, and memory, none of which are built
-yet. The Results page includes an inline "Review Answers" toggle so answer review is covered for
-Phase 1 without a separate route.
+`Review`, `History`, `Study`, `Progress`, `Settings` from the full roadmap don't exist yet — they
+depend on RAG-backed answers, agents, and memory, none of which are built yet. The Results page
+includes an inline "Review Answers" toggle so answer review is covered without a separate route.
 
 ## Folder structure (implemented so far)
 
@@ -37,18 +38,21 @@ frontend/src/
 │   └── Layout.tsx            Header + <Outlet /> shell used by every route
 ├── pages/
 │   ├── Home/Home.tsx
+│   ├── Documents/Documents.tsx
 │   ├── QuizSetup/QuizSetup.tsx
 │   ├── Quiz/Quiz.tsx
 │   └── Results/Results.tsx
 ├── services/
 │   ├── api.ts                axios instance (baseURL: /api)
 │   ├── quizApi.ts            typed wrapper for quiz/question/result endpoints
-│   └── courseApi.ts          typed wrapper for course/week endpoints
+│   ├── courseApi.ts          typed wrapper for course/week endpoints
+│   └── documentApi.ts        typed wrapper for document upload/list/delete/search
 ├── types/
 │   ├── Question.ts
 │   ├── Quiz.ts
 │   ├── Result.ts             mirror the backend's Pydantic schemas field-for-field
-│   └── Course.ts
+│   ├── Course.ts
+│   └── Document.ts
 └── hooks/
     └── useTimer.ts            countdown hook used by the Quiz page's exam timer
 ```
@@ -79,10 +83,29 @@ Results
 Scoring is never computed client-side — the Quiz page only collects answers and flags; the
 backend returns the authoritative score on submit.
 
-**Course selection:** `QuizSetup` fetches all courses and just uses the first one — there's no
-course picker in the UI yet since the seed data only creates one course. The API
+**Course selection:** `QuizSetup` and `Documents` both fetch all courses and just use the first
+one — there's no course picker in the UI yet since the seed data only creates one course. The API
 (`GET /api/courses`) already supports more than one; adding a `<select>` when that becomes true
-is a small, isolated change to `QuizSetup.tsx` rather than a redesign.
+is a small, isolated change rather than a redesign.
+
+## How the Documents page works
+
+```text
+Documents
+  → getCourses() → getWeeks(courseId)   on mount, populates the "week (optional)" <select>
+  → getDocuments(courseId)              on mount and after every upload/delete
+  → uploadDocument(courseId, weekId, file)   multipart/form-data POST; awaits the full
+                                              extract→chunk→embed→store pipeline server-side
+                                              before resolving (see backend.md — it's synchronous)
+  → deleteDocument(documentId)          removes the doc, its chunks, and its file server-side
+  → searchDocuments(query, courseId)    POST /api/documents/search; renders each match's
+                                         filename, page number, and similarity as a percentage
+```
+
+There's no polling or progress bar for the upload — because processing is synchronous on the
+backend today, the `Upload` button's "Uploading & processing…" state covers the whole pipeline
+and the document simply appears in the list already `ready` (or `failed`, with an error message)
+once the request resolves.
 
 ## Local setup
 

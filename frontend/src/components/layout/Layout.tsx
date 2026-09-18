@@ -8,6 +8,14 @@ export function Layout() {
           <Link to="/" className="font-semibold text-lg text-slate-900">
             StudyForge
           </Link>
+          <nav className="flex items-center gap-4 text-sm text-slate-600">
+            <Link to="/documents" className="hover:text-slate-900">
+              Documents
+            </Link>
+            <Link to="/quiz/setup" className="hover:text-slate-900">
+              Quiz
+            </Link>
+          </nav>
         </div>
       </header>
       <main className="flex-1 mx-auto w-full max-w-4xl px-4 py-8">

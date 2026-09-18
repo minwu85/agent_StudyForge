@@ -42,7 +42,8 @@ From the repo root:
 docker compose up -d
 ```
 
-This pulls `postgres:16-alpine` (first run only) and starts a container named
+This pulls `pgvector/pgvector:pg16` (first run only — a Postgres 16 image with the pgvector
+extension pre-installed, needed for Phase 3's document embeddings) and starts a container named
 `studyforge-postgres`, publishing port `5432` on localhost with credentials matching
 `backend/.env.example` (`studyforge` / `studyforge`, database `studyforge`). Data persists in a
 named Docker volume (`postgres_data`) across restarts.
