@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.quiz import Quiz, QuizQuestion
 
 
-def create(db: Session, quiz: Quiz) -> Quiz:
+def save(db: Session, quiz: Quiz) -> Quiz:
     db.add(quiz)
     db.commit()
     db.refresh(quiz)
@@ -17,10 +17,3 @@ def get_by_id(db: Session, quiz_id: int) -> Quiz | None:
         .filter(Quiz.id == quiz_id)
         .first()
     )
-
-
-def save(db: Session, quiz: Quiz) -> Quiz:
-    db.add(quiz)
-    db.commit()
-    db.refresh(quiz)
-    return quiz

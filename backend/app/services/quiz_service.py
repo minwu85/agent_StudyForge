@@ -26,7 +26,7 @@ def create_quiz(db: Session, request: QuizCreateRequest) -> Quiz:
         QuizQuestion(question_id=question.id, question_order=index)
         for index, question in enumerate(questions)
     ]
-    return quiz_repository.create(db, quiz)
+    return quiz_repository.save(db, quiz)
 
 
 def get_quiz(db: Session, quiz_id: int) -> Quiz:

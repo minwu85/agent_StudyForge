@@ -4,10 +4,6 @@ from sqlalchemy.orm import Session
 from app.models.question import Difficulty, Question
 
 
-def get_by_ids(db: Session, ids: list[int]) -> list[Question]:
-    return db.execute(select(Question).where(Question.id.in_(ids))).scalars().all()
-
-
 def list_topics(db: Session) -> list[tuple[str, int, list[Difficulty]]]:
     rows = db.execute(
         select(Question.topic, Question.difficulty).order_by(Question.topic)
