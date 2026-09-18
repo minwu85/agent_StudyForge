@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime, timezone
 
-from sqlalchemy import Enum, ForeignKey, String
+from sqlalchemy import JSON, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.connection import Base
@@ -19,6 +19,7 @@ class Quiz(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     topic: Mapped[str | None] = mapped_column(String(120), nullable=True)
     difficulty: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    week_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
     question_count: Mapped[int]
     time_limit_minutes: Mapped[int | None] = mapped_column(nullable=True)
     status: Mapped[QuizStatus] = mapped_column(Enum(QuizStatus), default=QuizStatus.IN_PROGRESS)

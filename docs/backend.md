@@ -1,7 +1,8 @@
 # Backend
 
 FastAPI + SQLAlchemy + PostgreSQL. This document describes what is actually implemented today
-(Phase 1 MVP — see [roadmap.md](roadmap.md) for the full long-term plan).
+(Phase 1 MVP + Phase 2 question database — see [roadmap.md](roadmap.md) for the full long-term
+plan).
 
 ## Stack
 
@@ -37,6 +38,7 @@ backend/
 │   ├── api/
 │   │   ├── dependencies.py      re-exports get_db for routes
 │   │   └── routes/
+│   │       ├── courses.py       GET /api/courses, GET /api/courses/{id}/weeks
 │   │       ├── questions.py     GET /api/questions/topics
 │   │       ├── quizzes.py       POST/GET /api/quizzes, POST /api/quizzes/{id}/submit
 │   │       └── results.py       GET /api/results/{id}, GET /api/results/{id}/review
@@ -44,18 +46,22 @@ backend/
 │   │   ├── quiz_service.py      create_quiz, get_quiz, submit_quiz (scoring logic lives here)
 │   │   └── result_service.py    result_summary, review (read-only, post-submission)
 │   ├── repositories/
-│   │   ├── question_repository.py   list_topics, random_questions
+│   │   ├── course_repository.py     list_courses, get_by_id
+│   │   ├── week_repository.py       list_weeks_with_counts
+│   │   ├── question_repository.py   list_topics, random_questions (topic/difficulty/week_ids)
 │   │   └── quiz_repository.py       save, get_by_id (with eager-loaded questions)
 │   ├── models/
+│   │   ├── course.py            Course, Week
 │   │   ├── question.py          Question, Difficulty, AnswerOption
 │   │   └── quiz.py              Quiz, QuizQuestion, QuizStatus
 │   ├── schemas/
+│   │   ├── course.py            CoursePublic, WeekSummary
 │   │   ├── question.py          QuestionPublic (no answer), QuestionWithAnswer, TopicSummary
 │   │   ├── quiz.py               QuizCreateRequest, QuizPublic, QuizSubmitRequest
 │   │   └── result.py             ResultSummary, ReviewResponse
 │   └── database/
 │       ├── connection.py        SQLAlchemy engine/session, Base, get_db dependency
-│       └── seed.py              creates tables + inserts 32 sample questions
+│       └── seed.py              resets schema + seeds 1 course, 5 weeks, 32 questions
 └── requirements.txt
 ```
 
@@ -63,23 +69,35 @@ Folders described in the roadmap that don't exist yet (`agents/`, `rag/`, `ocr/`
 `memory/`, `evaluation/`, `prompts/`) are intentionally not scaffolded — they belong to later
 phases and would just be empty placeholders today.
 
-## Data model (Phase 1)
+## Data model (Phase 1 + 2)
 
 ```text
-questions                    quizzes                      quiz_questions
-─────────                    ───────                      ──────────────
-id                            id                            id
-topic                         topic (filter used)           quiz_id  → quizzes.id
-question_text                 difficulty (filter used)       question_id → questions.id
-option_a..option_d            question_count                 question_order
-correct_answer (A-D)          time_limit_minutes              selected_answer (nullable)
-explanation                   status (in_progress/completed)  is_correct (nullable)
-difficulty (easy/med/hard)    score (nullable)                 flagged
-created_at                    started_at / completed_at
+courses          weeks                    questions                      quizzes                      quiz_questions
+───────          ─────                    ─────────                      ───────                      ──────────────
+id                id                       id                             id                            id
+name              course_id → courses.id   course_id → courses.id         topic (filter used)           quiz_id  → quizzes.id
+description       week_number              week_id → weeks.id             difficulty (filter used)       question_id → questions.id
+                  title                    topic                          week_ids (JSON, filter used)    question_order
+                                            question_text                  question_count                  selected_answer (nullable)
+                                            option_a..option_d             time_limit_minutes                is_correct (nullable)
+                                            correct_answer (A-D)           status (in_progress/completed)     flagged
+                                            explanation                    score (nullable)
+                                            difficulty (easy/med/hard)     started_at / completed_at
+                                            created_at
 ```
 
-`courses` / `weeks` (from the full roadmap's schema) aren't modelled yet — Phase 1 filters
-quizzes by a flat `topic` string on `Question` instead. That's the Phase 2 upgrade.
+A `Question` belongs to exactly one `Week` (and, denormalized for convenience, the `Course` that
+week belongs to) as well as carrying a free-text `topic` tag — weeks are "when it was taught",
+topic is "what it's about". A quiz can filter by any combination of `week_ids` (multi-select),
+`topic`, and `difficulty`; whichever ones were used are recorded on the `Quiz` row itself so a
+completed quiz still shows what filters produced it.
+
+**No migrations yet.** There's no Alembic setup — `database/seed.py` calls
+`Base.metadata.drop_all()` then `create_all()` on every run, so changing a model means rerunning
+the seed script, which wipes all local data (including past quiz attempts). This is fine for a
+single-developer local project pre-launch; introducing Alembic is deferred until the schema
+needs to change without losing real data (see [roadmap.md](roadmap.md)'s
+`database/migrations/` entry).
 
 ## Why answers are never sent to the client mid-quiz
 
@@ -93,8 +111,10 @@ frontend never computes or trusts a score itself.
 | Method | Path                          | Purpose                                              |
 | ------ | ----------------------------- | ----------------------------------------------------- |
 | GET    | `/api/health`                 | Liveness check                                        |
+| GET    | `/api/courses`                | List courses                                          |
+| GET    | `/api/courses/{id}/weeks`     | Weeks for a course, with question counts + available difficulties |
 | GET    | `/api/questions/topics`       | Topics with question counts + available difficulties |
-| POST   | `/api/quizzes`                | Create a quiz (random question selection by filters) |
+| POST   | `/api/quizzes`                | Create a quiz (random question selection by topic/difficulty/week_ids filters) |
 | GET    | `/api/quizzes/{id}`           | Fetch a quiz (answers hidden until completed)         |
 | POST   | `/api/quizzes/{id}/submit`    | Submit answers, scores server-side, marks completed   |
 | GET    | `/api/results/{id}`           | Score summary                                         |
@@ -119,7 +139,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env        # defaults already match docker-compose.yml
 
-python -m app.database.seed # creates tables + inserts sample questions (idempotent)
+python -m app.database.seed # resets the schema + inserts a sample course/weeks/questions
 uvicorn app.main:app --reload --port 8000
 ```
 

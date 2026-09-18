@@ -10,6 +10,7 @@ from app.schemas.question import QuestionPublic
 class QuizCreateRequest(BaseModel):
     topic: str | None = None
     difficulty: Difficulty | None = None
+    week_ids: list[int] | None = None
     question_count: int = 10
     time_limit_minutes: int | None = None
 
@@ -29,6 +30,7 @@ class QuizPublic(BaseModel):
     id: int
     topic: str | None
     difficulty: str | None
+    week_ids: list[int] | None
     question_count: int
     time_limit_minutes: int | None
     status: QuizStatus

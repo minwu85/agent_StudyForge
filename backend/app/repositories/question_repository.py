@@ -26,11 +26,14 @@ def random_questions(
     count: int,
     topic: str | None = None,
     difficulty: Difficulty | None = None,
+    week_ids: list[int] | None = None,
 ) -> list[Question]:
     query = select(Question)
     if topic:
         query = query.where(Question.topic == topic)
     if difficulty:
         query = query.where(Question.difficulty == difficulty)
+    if week_ids:
+        query = query.where(Question.week_id.in_(week_ids))
     query = query.order_by(func.random()).limit(count)
     return db.execute(query).scalars().all()

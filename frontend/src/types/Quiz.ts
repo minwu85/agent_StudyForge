@@ -5,6 +5,7 @@ export type QuizStatus = 'in_progress' | 'completed'
 export interface QuizCreateRequest {
   topic?: string | null
   difficulty?: Difficulty | null
+  week_ids?: number[] | null
   question_count: number
   time_limit_minutes?: number | null
 }
@@ -20,6 +21,7 @@ export interface QuizPublic {
   id: number
   topic: string | null
   difficulty: string | null
+  week_ids: number[] | null
   question_count: number
   time_limit_minutes: number | null
   status: QuizStatus

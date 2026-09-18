@@ -1,10 +1,22 @@
-"""Creates tables and seeds sample questions for local development.
+"""Creates tables and seeds a sample course, weeks, and questions for local development.
 
 Run with: python -m app.database.seed
+
+There are no migrations yet (see docs/backend.md) — this script drops and recreates all
+tables on every run, so it is destructive to any existing local data.
 """
 
 from app.database.connection import Base, SessionLocal, engine
+from app.models.course import Course, Week
 from app.models.question import AnswerOption, Difficulty, Question
+
+WEEKS = [
+    (1, "Programming Fundamentals", "Python Basics"),
+    (2, "Data Structures & Algorithms", "Data Structures"),
+    (3, "Databases & SQL", "Databases"),
+    (4, "Web Development", "Web Development"),
+    (5, "Operating Systems", "Operating Systems"),
+]
 
 SAMPLE_QUESTIONS = [
     # Python Basics
@@ -368,15 +380,30 @@ SAMPLE_QUESTIONS = [
 
 
 def seed():
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
-        if db.query(Question).count() > 0:
-            print("Questions already seeded, skipping.")
-            return
-        db.add_all(Question(**data) for data in SAMPLE_QUESTIONS)
+        course = Course(
+            name="Introduction to Computer Science",
+            description="A general-purpose first-year CS course used to demonstrate StudyForge.",
+        )
+        db.add(course)
+        db.flush()  # assigns course.id
+
+        week_id_by_topic = {}
+        for week_number, title, topic in WEEKS:
+            week = Week(course_id=course.id, week_number=week_number, title=title)
+            db.add(week)
+            db.flush()  # assigns week.id
+            week_id_by_topic[topic] = week.id
+
+        db.add_all(
+            Question(course_id=course.id, week_id=week_id_by_topic[data["topic"]], **data)
+            for data in SAMPLE_QUESTIONS
+        )
         db.commit()
-        print(f"Seeded {len(SAMPLE_QUESTIONS)} questions.")
+        print(f"Seeded 1 course, {len(WEEKS)} weeks, and {len(SAMPLE_QUESTIONS)} questions.")
     finally:
         db.close()
 

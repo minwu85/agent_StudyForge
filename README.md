@@ -5,15 +5,18 @@ AI-generated quizzes, exam simulations, and a personalised tutor. See
 [docs/roadmap.md](docs/roadmap.md) for the full long-term vision (agents, RAG, OCR, memory,
 adaptive learning); this README covers what's actually built right now.
 
-## Status: Phase 1 — Basic Quiz Platform (MVP)
+## Status: Phase 2 — Question Database
 
 A complete, working quiz application with no AI yet: React frontend, FastAPI backend,
-PostgreSQL database. Users pick a topic/difficulty/question count, take a timed exam, submit,
-and review their results — all server-scored, with a small seeded question bank standing in for
+PostgreSQL database. Questions belong to a course and a week (Phase 2), plus a free-text topic
+tag; users filter a quiz by any mix of weeks/topic/difficulty, take a timed exam, submit, and
+review their results — all server-scored, with a small seeded question bank standing in for
 document-derived questions until Phase 3 (document/RAG pipeline) lands.
 
 **Implemented:**
-- Topic + difficulty + question-count + optional time-limit quiz setup
+- Course → Week → Question data model, seeded with 1 course, 5 weeks, 32 questions
+- Quiz setup filtered by any combination of weeks (multi-select), topic, and difficulty, plus
+  question count and an optional time limit
 - Timed exam UI: question navigator, flagging, previous/next, manual and auto-submit
 - Server-side scoring (the frontend never sees correct answers until after submit)
 - Results page with score summary and a per-question answer review (correct answer + your
@@ -61,7 +64,7 @@ cd backend
 python -m venv venv && venv\Scripts\activate   # Windows; use `source venv/bin/activate` on macOS/Linux
 pip install -r requirements.txt
 cp .env.example .env
-python -m app.database.seed
+python -m app.database.seed   # resets the schema + seeds a course/weeks/questions
 uvicorn app.main:app --reload --port 8000
 ```
 

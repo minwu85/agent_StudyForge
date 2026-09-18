@@ -10,7 +10,11 @@ from app.schemas.quiz import QuizCreateRequest, QuizSubmitRequest
 
 def create_quiz(db: Session, request: QuizCreateRequest) -> Quiz:
     questions = question_repository.random_questions(
-        db, count=request.question_count, topic=request.topic, difficulty=request.difficulty
+        db,
+        count=request.question_count,
+        topic=request.topic,
+        difficulty=request.difficulty,
+        week_ids=request.week_ids,
     )
     if not questions:
         raise HTTPException(status_code=404, detail="No questions match the selected filters")
@@ -18,6 +22,7 @@ def create_quiz(db: Session, request: QuizCreateRequest) -> Quiz:
     quiz = Quiz(
         topic=request.topic,
         difficulty=request.difficulty.value if request.difficulty else None,
+        week_ids=request.week_ids,
         question_count=len(questions),
         time_limit_minutes=request.time_limit_minutes,
         status=QuizStatus.IN_PROGRESS,

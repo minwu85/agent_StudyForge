@@ -1,7 +1,8 @@
 # Frontend
 
 React + TypeScript, built with Vite. This document describes what is actually implemented today
-(Phase 1 MVP — see [roadmap.md](roadmap.md) for the full long-term plan).
+(Phase 1 MVP + Phase 2 question database — see [roadmap.md](roadmap.md) for the full long-term
+plan).
 
 ## Stack
 
@@ -16,7 +17,7 @@ React + TypeScript, built with Vite. This document describes what is actually im
 
 ```text
 /               Home         Landing page, links to quiz setup
-/quiz/setup     QuizSetup    Pick topic, difficulty, question count, time limit → creates a quiz
+/quiz/setup     QuizSetup    Pick weeks, topic, difficulty, question count, time limit → creates a quiz
 /quiz/:quizId   Quiz         Exam-taking UI: timer, question nav grid, flagging, submit
 /results/:id    Results      Score summary + optional per-question review
 ```
@@ -41,11 +42,13 @@ frontend/src/
 │   └── Results/Results.tsx
 ├── services/
 │   ├── api.ts                axios instance (baseURL: /api)
-│   └── quizApi.ts            typed wrapper for every backend endpoint
+│   ├── quizApi.ts            typed wrapper for quiz/question/result endpoints
+│   └── courseApi.ts          typed wrapper for course/week endpoints
 ├── types/
 │   ├── Question.ts
 │   ├── Quiz.ts
-│   └── Result.ts             mirror the backend's Pydantic schemas field-for-field
+│   ├── Result.ts             mirror the backend's Pydantic schemas field-for-field
+│   └── Course.ts
 └── hooks/
     └── useTimer.ts            countdown hook used by the Quiz page's exam timer
 ```
@@ -55,7 +58,8 @@ frontend/src/
 ```text
 QuizSetup
   → getTopics()              on mount, populates the topic <select>
-  → createQuiz(filters)      on submit → navigate(`/quiz/${quiz.id}`)
+  → getCourses() → getWeeks(courseId)   on mount, populates the week checkbox grid
+  → createQuiz({ topic, difficulty, week_ids, ... })   on submit → navigate(`/quiz/${quiz.id}`)
 
 Quiz
   → getQuiz(quizId)          on mount; questions arrive WITHOUT correct answers
@@ -74,6 +78,11 @@ Results
 
 Scoring is never computed client-side — the Quiz page only collects answers and flags; the
 backend returns the authoritative score on submit.
+
+**Course selection:** `QuizSetup` fetches all courses and just uses the first one — there's no
+course picker in the UI yet since the seed data only creates one course. The API
+(`GET /api/courses`) already supports more than one; adding a `<select>` when that becomes true
+is a small, isolated change to `QuizSetup.tsx` rather than a redesign.
 
 ## Local setup
 

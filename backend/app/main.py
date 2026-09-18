@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import questions, quizzes, results
+from app.api.routes import courses, questions, quizzes, results
 from app.config import settings
 
 app = FastAPI(title="StudyForge API")
@@ -14,6 +14,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(courses.router)
 app.include_router(questions.router)
 app.include_router(quizzes.router)
 app.include_router(results.router)
