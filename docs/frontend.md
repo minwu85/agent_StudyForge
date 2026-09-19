@@ -1,7 +1,7 @@
 # Frontend
 
 React + TypeScript, built with Vite. This document describes what is actually implemented today
-(Phase 1 MVP + Phase 2 question database + Phase 3 document pipeline — see
+(Phase 1 MVP + Phase 2 question database + Phase 3 document pipeline + Phase 4 RAG — see
 [roadmap.md](roadmap.md) for the full long-term plan, and [progress.md](progress.md) for the
 phase-by-phase build log).
 
@@ -19,14 +19,17 @@ phase-by-phase build log).
 ```text
 /               Home         Landing page, links to quiz setup
 /documents      Documents    Upload PDFs, see processing status, semantic-search across them
+/study          Study        Ask a question about your material; see retrieved sources + the
+                              exact prompt that would be sent to an LLM (generation is stubbed —
+                              see backend.md Phase 4)
 /quiz/setup     QuizSetup    Pick weeks, topic, difficulty, question count, time limit → creates a quiz
 /quiz/:quizId   Quiz         Exam-taking UI: timer, question nav grid, flagging, submit
 /results/:id    Results      Score summary + optional per-question review
 ```
 
-`Review`, `History`, `Study`, `Progress`, `Settings` from the full roadmap don't exist yet — they
-depend on RAG-backed answers, agents, and memory, none of which are built yet. The Results page
-includes an inline "Review Answers" toggle so answer review is covered without a separate route.
+`Review`, `History`, `Progress`, `Settings` from the full roadmap don't exist yet — they depend
+on agents and personalised memory, neither of which is built yet. The Results page includes an
+inline "Review Answers" toggle so answer review is covered without a separate route.
 
 ## Folder structure (implemented so far)
 
@@ -39,6 +42,7 @@ frontend/src/
 ├── pages/
 │   ├── Home/Home.tsx
 │   ├── Documents/Documents.tsx
+│   ├── Study/Study.tsx
 │   ├── QuizSetup/QuizSetup.tsx
 │   ├── Quiz/Quiz.tsx
 │   └── Results/Results.tsx
@@ -46,13 +50,15 @@ frontend/src/
 │   ├── api.ts                axios instance (baseURL: /api)
 │   ├── quizApi.ts            typed wrapper for quiz/question/result endpoints
 │   ├── courseApi.ts          typed wrapper for course/week endpoints
-│   └── documentApi.ts        typed wrapper for document upload/list/delete/search
+│   ├── documentApi.ts        typed wrapper for document upload/list/delete/search
+│   └── studyApi.ts           typed wrapper for /api/study/chat
 ├── types/
 │   ├── Question.ts
 │   ├── Quiz.ts
 │   ├── Result.ts             mirror the backend's Pydantic schemas field-for-field
 │   ├── Course.ts
-│   └── Document.ts
+│   ├── Document.ts
+│   └── Study.ts
 └── hooks/
     └── useTimer.ts            countdown hook used by the Quiz page's exam timer
 ```
@@ -106,6 +112,22 @@ There's no polling or progress bar for the upload — because processing is sync
 backend today, the `Upload` button's "Uploading & processing…" state covers the whole pipeline
 and the document simply appears in the list already `ready` (or `failed`, with an error message)
 once the request resolves.
+
+## How the Study page works
+
+```text
+Study
+  → getCourses()                on mount, just uses the first course (same pattern as QuizSetup)
+  → askStudy(question, courseId)   on submit → POST /api/study/chat
+                                    renders response.answer, response.sources (filename, page,
+                                    similarity), and a collapsible <pre> showing response.prompt
+```
+
+The backend's `model` field in the response is checked (`response.model.startsWith('stub')`) to
+show an explicit amber banner explaining that generation isn't connected to a real LLM yet —
+the UI doesn't pretend the extractive fallback is a generated answer. Once Phase 4's stub is
+replaced with a real Claude call, that check simply stops matching and the banner disappears on
+its own; no frontend change needed.
 
 ## Local setup
 

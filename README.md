@@ -5,13 +5,14 @@ AI-generated quizzes, exam simulations, and a personalised tutor. See
 [docs/roadmap.md](docs/roadmap.md) for the full long-term vision (agents, RAG, OCR, memory,
 adaptive learning); this README covers what's actually built right now.
 
-## Status: Phase 3 — Document Pipeline
+## Status: Phase 4 — RAG (generation stubbed)
 
-A working quiz application (still no LLM calls) plus a document ingestion pipeline: React
-frontend, FastAPI backend, PostgreSQL + pgvector. Questions belong to a course and a week, and
-users can now upload their own PDFs, which get extracted, chunked, embedded locally, and made
-semantically searchable — the foundation Phase 4 (RAG) will build a grounded Q&A agent on top of.
-See [docs/progress.md](docs/progress.md) for the full phase-by-phase build log.
+A working quiz app plus a full RAG pipeline: React frontend, FastAPI backend, PostgreSQL +
+pgvector. Questions belong to a course and a week; users can upload their own PDFs, which get
+extracted, chunked, embedded locally, and made semantically searchable; a `/study` page retrieves
+relevant material for a question and builds the exact grounded-answer prompt the roadmap
+describes — with the actual LLM call left as a clearly-labeled stub by choice, not oversight (no
+API key/cost yet). See [docs/progress.md](docs/progress.md) for the full phase-by-phase build log.
 
 **Implemented:**
 - Course → Week → Question data model; quiz setup filtered by any combination of weeks
@@ -19,15 +20,20 @@ See [docs/progress.md](docs/progress.md) for the full phase-by-phase build log.
 - Timed exam UI: question navigator, flagging, previous/next, manual and auto-submit;
   server-side scoring; results with a per-question answer review
 - **PDF upload → text extraction → chunking → local embeddings → pgvector storage**, entirely
-  local/free (no API keys); a `/documents` page to upload, track processing status, and run
-  semantic search over your own material (raw chunk retrieval, no LLM synthesis yet — that's
-  Phase 4)
+  local/free (no API keys); a `/documents` page to upload, track processing status, and run raw
+  semantic search
+- **RAG retrieval + prompt construction**: a `/study` page asks a question, retrieves the most
+  relevant chunks across your uploaded material, and builds a structured
+  (ROLE/TASK/CONTEXT/CONSTRAINTS/OUTPUT FORMAT) grounded-answer prompt — viewable in full in the
+  UI. The actual generation step is a documented stub (returns the best-matching passage instead
+  of a model-generated answer) so the pipeline is real end-to-end without incurring API cost;
+  swapping in Claude Haiku 4.5 is a one-function change
 - Scanned/image-only pages are detected and skipped (not silently dropped) — OCR itself is a
   documented stub, not implemented yet
 
-**Not yet built** (see [docs/roadmap.md](docs/roadmap.md) for the phased plan): RAG-backed
-grounded answers, the agent system (Study/Quiz/Tutor/Exam/Evaluation/Analytics agents), learning
-memory, adaptive difficulty, OCR, and the coding sandbox.
+**Not yet built** (see [docs/roadmap.md](docs/roadmap.md) for the phased plan): a real LLM call
+for generation, the agent system (Study/Quiz/Tutor/Exam/Evaluation/Analytics agents as a proper
+orchestrated architecture), learning memory, adaptive difficulty, OCR, and the coding sandbox.
 
 ## Tech stack (current)
 

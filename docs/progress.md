@@ -10,7 +10,7 @@ verified. For current-state architecture docs (not a log), see [backend.md](back
 | 1 | Basic Quiz Platform | ✅ Done |
 | 2 | Question Database | ✅ Done |
 | 3 | Document Pipeline | ✅ Done |
-| 4 | RAG | ⬜ Not started |
+| 4 | RAG | ⚠️ Done (generation stubbed) |
 | 5 | Quiz Agent | ⬜ Not started |
 | 6 | Tutor Agent | ⬜ Not started |
 | 7 | Personalised Memory | ⬜ Not started |
@@ -112,3 +112,44 @@ correctly (`status: ready`, correct page/chunk counts); ran a semantic search qu
 it returned the right chunk with a sensible similarity score; repeated the same upload → search →
 delete flow through the actual `/documents` UI in the browser pane and confirmed the list and
 search results render correctly and stay in sync after delete.
+
+---
+
+## Phase 4 — RAG ⚠️ (generation stubbed)
+
+Wires document search into the "Question → Retriever → LLM → Grounded answer" pipeline the
+roadmap describes — with the LLM call itself deliberately left as a stub, by explicit choice, not
+oversight.
+
+**Decision (asked, not assumed):** offered a choice between wiring up a real Claude API call now
+(cost + API key required) or building the full retrieval/prompt plumbing with generation stubbed,
+swappable later. Chose the stub — Claude Haiku 4.5 was named as the target model for when it's
+wired up for real, but no API call happens yet and no key is required.
+
+**Built:**
+- `rag/retriever.py`: the shared "question → ranked chunks" entry point. `vector_store.py` stayed
+  as the low-level pgvector query; `document_service.search_chunks` (Phase 3's raw search
+  endpoint) was refactored to call the new retriever too, removing duplicated embed+search+map
+  logic that existed in both places
+- `prompts/study_prompts.py`: a real, structured prompt (ROLE/TASK/CONTEXT/CONSTRAINTS/OUTPUT
+  FORMAT per the roadmap's prompt-engineering guidance) that numbers and cites each retrieved
+  chunk with its source document and page
+- `rag/generation.py`: the one stubbed function — `generate_answer` returns the closest matching
+  chunk verbatim, clearly labeled as not model-generated, instead of calling an LLM
+- `POST /api/study/chat`: returns the question, the (stub) answer, which sources were used, *and*
+  the exact prompt that would be sent to a real LLM — so the whole pipeline is inspectable even
+  without generation
+- New `/study` page: ask a question, see the answer, sources with similarity scores, and a
+  collapsible view of the full constructed prompt; an amber banner (driven by checking
+  `response.model.startsWith('stub')`) is honest about generation not being connected yet
+
+**Known limitation (accepted, documented):** `generate_answer` doesn't call an LLM. Swapping in
+Claude Haiku 4.5 is scoped to be a small, isolated change — edit one function's body to call
+`client.messages.create(...)` with the already-built prompt — with no changes needed anywhere
+else (retriever, prompt builder, route, schemas, or frontend).
+
+**Verified:** uploaded a test PDF, asked `/study/chat` a question via `curl` and confirmed
+retrieval found the right chunk, the constructed prompt was correctly structured with proper
+citations, and the response's `model` field honestly reported the stub; repeated the same
+question through the actual `/study` UI in the browser pane and confirmed the answer, sources,
+stub banner, and expandable prompt view all render correctly.

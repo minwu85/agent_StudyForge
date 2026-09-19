@@ -12,6 +12,9 @@ export function Layout() {
             <Link to="/documents" className="hover:text-slate-900">
               Documents
             </Link>
+            <Link to="/study" className="hover:text-slate-900">
+              Study
+            </Link>
             <Link to="/quiz/setup" className="hover:text-slate-900">
               Quiz
             </Link>

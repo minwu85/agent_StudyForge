@@ -6,9 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.document import Document, DocumentStatus
-from app.rag import vector_store
-from app.rag.embeddings import embed_query
 from app.rag.pipeline import process_document
+from app.rag.retriever import retrieve
 from app.repositories import document_repository
 from app.schemas.document import ChunkSearchRequest, ChunkSearchResult
 
@@ -71,15 +70,14 @@ def delete_document(db: Session, document_id: int) -> None:
 
 
 def search_chunks(db: Session, request: ChunkSearchRequest) -> list[ChunkSearchResult]:
-    query_embedding = embed_query(request.query)
-    results = vector_store.search_chunks(db, query_embedding, course_id=request.course_id, top_k=request.top_k)
+    chunks = retrieve(db, request.query, course_id=request.course_id, top_k=request.top_k)
     return [
         ChunkSearchResult(
-            document_id=chunk.document_id,
-            document_filename=chunk.document.filename,
-            page_number=chunk.page_number,
-            content=chunk.content,
-            similarity=max(0.0, 1.0 - distance),
+            document_id=c.document_id,
+            document_filename=c.document_filename,
+            page_number=c.page_number,
+            content=c.content,
+            similarity=c.similarity,
         )
-        for chunk, distance in results
+        for c in chunks
     ]
