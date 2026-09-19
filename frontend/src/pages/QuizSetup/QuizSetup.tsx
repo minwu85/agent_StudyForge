@@ -74,15 +74,15 @@ export function QuizSetup() {
 
   return (
     <div className="max-w-lg mx-auto">
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Quiz Setup</h1>
-      {course && <p className="text-sm text-slate-500 mb-6">{course.name}</p>}
+      <h1 className="text-2xl font-bold text-stone-900 mb-1">Quiz Setup</h1>
+      {course && <p className="text-sm text-stone-500 mb-6">{course.name}</p>}
 
       {error && <p className="mb-4 text-red-600 text-sm">{error}</p>}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {weeks.length > 0 && (
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
+            <label className="block text-sm font-medium text-stone-700 mb-2">
               Weeks {selectedWeekIds.size === 0 && '(none selected = all weeks)'}
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -91,19 +91,19 @@ export function QuizSetup() {
                   key={w.id}
                   className={`flex items-center gap-2 rounded-md border px-3 py-2 cursor-pointer text-sm ${
                     selectedWeekIds.has(w.id)
-                      ? 'border-indigo-500 bg-indigo-50'
-                      : 'border-slate-200 hover:bg-slate-50'
+                      ? 'border-leaf-500 bg-leaf-50'
+                      : 'border-stone-200 hover:bg-stone-50'
                   }`}
                 >
                   <input
                     type="checkbox"
                     checked={selectedWeekIds.has(w.id)}
                     onChange={() => toggleWeek(w.id)}
-                    className="accent-indigo-600"
+                    className="accent-leaf-600"
                   />
                   <span>
                     Week {w.week_number}: {w.title}{' '}
-                    <span className="text-slate-400">({w.question_count})</span>
+                    <span className="text-stone-400">({w.question_count})</span>
                   </span>
                 </label>
               ))}
@@ -112,11 +112,11 @@ export function QuizSetup() {
         )}
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Topic</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1">Topic</label>
           <select
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2"
+            className="w-full rounded-md border border-stone-300 px-3 py-2"
           >
             <option value="any">Any topic</option>
             {topics.map((t) => (
@@ -128,11 +128,11 @@ export function QuizSetup() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Difficulty</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1">Difficulty</label>
           <select
             value={difficulty}
             onChange={(e) => setDifficulty(e.target.value as Difficulty | 'any')}
-            className="w-full rounded-md border border-slate-300 px-3 py-2"
+            className="w-full rounded-md border border-stone-300 px-3 py-2"
           >
             {DIFFICULTIES.map((d) => (
               <option key={d} value={d}>
@@ -143,7 +143,7 @@ export function QuizSetup() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label className="block text-sm font-medium text-stone-700 mb-1">
             Number of questions {maxAvailable > 0 && `(up to ${maxAvailable} available)`}
           </label>
           <input
@@ -152,12 +152,12 @@ export function QuizSetup() {
             max={Math.max(maxAvailable, 1)}
             value={questionCount}
             onChange={(e) => setQuestionCount(Number(e.target.value))}
-            className="w-full rounded-md border border-slate-300 px-3 py-2"
+            className="w-full rounded-md border border-stone-300 px-3 py-2"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label className="block text-sm font-medium text-stone-700 mb-1">
             Time limit (minutes, optional)
           </label>
           <input
@@ -165,7 +165,7 @@ export function QuizSetup() {
             min={1}
             value={timeLimit}
             onChange={(e) => setTimeLimit(e.target.value === '' ? '' : Number(e.target.value))}
-            className="w-full rounded-md border border-slate-300 px-3 py-2"
+            className="w-full rounded-md border border-stone-300 px-3 py-2"
             placeholder="No time limit"
           />
         </div>
@@ -173,7 +173,7 @@ export function QuizSetup() {
         <button
           type="submit"
           disabled={loading || maxAvailable === 0}
-          className="w-full rounded-lg bg-indigo-600 px-6 py-3 text-white font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+          className="w-full rounded-lg bg-leaf-600 px-6 py-3 text-white font-medium hover:bg-leaf-700 disabled:opacity-50 transition-colors"
         >
           {loading ? 'Starting…' : 'Start Exam'}
         </button>

@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+@theme {
+  --color-leaf-50: #f4f7f0;
+  --color-leaf-100: #e5edd9;
+  --color-leaf-200: #cbdcb6;
+  --color-leaf-300: #a9c78c;
+  --color-leaf-400: #86ae66;
+  --color-leaf-500: #679349;
+  --color-leaf-600: #4f7838;
+  --color-leaf-700: #3f5f2e;
+  --color-leaf-800: #344d27;
+  --color-leaf-900: #2b4021;
+}
+
 body {
-  @apply bg-slate-50 text-slate-900;
+  @apply bg-stone-50 text-stone-900;
 }

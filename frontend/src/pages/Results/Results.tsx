@@ -28,18 +28,18 @@ export function Results() {
   }
 
   if (error) return <p className="text-red-600">{error}</p>
-  if (!summary) return <p className="text-slate-500">Loading results…</p>
+  if (!summary) return <p className="text-stone-500">Loading results…</p>
 
   return (
     <div>
-      <div className="rounded-lg border border-slate-200 bg-white p-8 text-center">
-        <p className="text-sm uppercase tracking-wide text-slate-500">Your Score</p>
-        <p className="mt-2 text-5xl font-bold text-indigo-600">{summary.score_percentage}%</p>
-        <p className="mt-2 text-slate-600">
+      <div className="rounded-lg border border-stone-200 bg-white p-8 text-center">
+        <p className="text-sm uppercase tracking-wide text-stone-500">Your Score</p>
+        <p className="mt-2 text-5xl font-bold text-leaf-600">{summary.score_percentage}%</p>
+        <p className="mt-2 text-stone-600">
           {summary.correct_count} out of {summary.question_count} correct
         </p>
         {summary.time_taken_seconds !== null && (
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-stone-400">
             Completed in {Math.round(summary.time_taken_seconds / 60)} min
           </p>
         )}
@@ -47,14 +47,14 @@ export function Results() {
         <div className="mt-6 flex justify-center gap-3">
           <Link
             to="/quiz/setup"
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            className="rounded-md bg-leaf-600 px-4 py-2 text-sm font-medium text-white hover:bg-leaf-700"
           >
             Take Another Quiz
           </Link>
           {!showReview && (
             <button
               onClick={loadReview}
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50"
+              className="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium hover:bg-stone-50"
             >
               Review Answers
             </button>
@@ -64,7 +64,7 @@ export function Results() {
 
       {showReview && (
         <div className="mt-8 space-y-4">
-          {!review && <p className="text-slate-500">Loading review…</p>}
+          {!review && <p className="text-stone-500">Loading review…</p>}
           {review?.items.map((item) => (
             <div
               key={item.question_order}
@@ -72,7 +72,7 @@ export function Results() {
                 item.is_correct ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'
               }`}
             >
-              <p className="font-medium text-slate-900">
+              <p className="font-medium text-stone-900">
                 {item.question_order + 1}. {item.question.question_text}
               </p>
               <div className="mt-3 space-y-1 text-sm">
@@ -90,7 +90,7 @@ export function Results() {
                           ? 'font-semibold text-emerald-700'
                           : isSelected
                             ? 'font-semibold text-red-700'
-                            : 'text-slate-600'
+                            : 'text-stone-600'
                       }
                     >
                       {key}. {text}
@@ -100,7 +100,7 @@ export function Results() {
                   )
                 })}
               </div>
-              <p className="mt-3 text-sm text-slate-500">{item.question.explanation}</p>
+              <p className="mt-3 text-sm text-stone-500">{item.question.explanation}</p>
             </div>
           ))}
         </div>

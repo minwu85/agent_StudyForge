@@ -1,35 +1,59 @@
 # Frontend
 
 React + TypeScript, built with Vite. This document describes what is actually implemented today
-(Phase 1 MVP + Phase 2 question database + Phase 3 document pipeline + Phase 4 RAG — see
-[roadmap.md](roadmap.md) for the full long-term plan, and [progress.md](progress.md) for the
-phase-by-phase build log).
+(Phase 1 MVP + Phase 2 question database + Phase 3 document pipeline + Phase 4 RAG, plus a
+design pass and a Progress page — see [roadmap.md](roadmap.md) for the full long-term plan, and
+[progress.md](progress.md) for the phase-by-phase build log).
 
 ## Stack
 
 - **React 19** + **TypeScript** — UI
 - **Vite** — dev server and build (proxies `/api/*` to the backend on port 8000, see
   `vite.config.ts`)
-- **React Router** — client-side routing between the four MVP pages
-- **Tailwind CSS v4** (via `@tailwindcss/vite`, no `tailwind.config.js` needed) — styling
+- **React Router** — client-side routing, plus a persistent sidebar shell (see Design system)
+- **Tailwind CSS v4** (via `@tailwindcss/vite`, no `tailwind.config.js` needed) — styling, with a
+  custom `leaf` green color scale defined in `index.css`
+- **lucide-react** — icon set used throughout the sidebar and page headers
 - **Axios** — HTTP client, wrapped in `services/api.ts`
+
+## Design system
+
+The UI uses a green/botanical theme rather than Tailwind's default palette:
+
+- **Colors**: a custom `leaf` scale (`leaf-50`..`leaf-900`, defined via Tailwind v4's `@theme` in
+  `index.css`) for brand/interactive elements (buttons, active nav state, links), paired with
+  Tailwind's built-in `stone` scale for neutrals (warmer than `slate`, to read as "earthy" rather
+  than "corporate gray"). `emerald` is kept only for semantic success feedback (a correct quiz
+  answer) so it stays visually distinct from `leaf` brand actions.
+- **Layout**: a persistent left sidebar (`components/layout/Layout.tsx`) with the logo, nav
+  links with icons, and a soft leaf decoration at its foot — replacing the earlier top-nav-only
+  shell once there were enough pages to justify a dashboard-style shell. Below the `md` Tailwind
+  breakpoint the sidebar is replaced by a horizontally-scrollable top bar with the same nav items
+  (`hidden md:flex` / `md:hidden`), since a fixed sidebar doesn't fit a phone-width viewport.
+- **Decoration**: `components/common/LeafDecoration.tsx` — a hand-drawn SVG (radial wash +
+  layered leaf silhouettes + vein strokes, all using the `leaf` CSS variables so it stays in sync
+  with the palette) used sparingly: the sidebar footer and the Home page hero's two corners.
+  `corner="bottom-left" | "top-right"` just rotates the same artwork 180° rather than drawing it
+  twice.
 
 ## Pages
 
 ```text
-/               Home         Landing page, links to quiz setup
+/               Home         Landing page with quick links to every other page
 /documents      Documents    Upload PDFs, see processing status, semantic-search across them
 /study          Study        Ask a question about your material; see retrieved sources + the
                               exact prompt that would be sent to an LLM (generation is stubbed —
                               see backend.md Phase 4)
+/progress       Progress     Quizzes completed, average score, a score-over-time chart, and
+                              accuracy by topic
 /quiz/setup     QuizSetup    Pick weeks, topic, difficulty, question count, time limit → creates a quiz
 /quiz/:quizId   Quiz         Exam-taking UI: timer, question nav grid, flagging, submit
 /results/:id    Results      Score summary + optional per-question review
 ```
 
-`Review`, `History`, `Progress`, `Settings` from the full roadmap don't exist yet — they depend
-on agents and personalised memory, neither of which is built yet. The Results page includes an
-inline "Review Answers" toggle so answer review is covered without a separate route.
+`Review`, `History`, `Settings` from the full roadmap don't exist yet — `Review` is covered
+inline on the Results page instead of a separate route, and `History`/`Settings` aren't needed
+until there's more than one thing to look back on or configure.
 
 ## Folder structure (implemented so far)
 
@@ -37,12 +61,17 @@ inline "Review Answers" toggle so answer review is covered without a separate ro
 frontend/src/
 ├── App.tsx                  Route definitions
 ├── main.tsx                 React root
-├── components/layout/
-│   └── Layout.tsx            Header + <Outlet /> shell used by every route
+├── components/
+│   ├── layout/Layout.tsx      sidebar + mobile top bar shell used by every route (see Design system)
+│   ├── common/LeafDecoration.tsx   the reusable botanical corner decoration
+│   └── progress/
+│       ├── ScoreTrendChart.tsx     hand-rolled SVG line/area chart (no charting library)
+│       └── TopicAccuracyBars.tsx   accuracy-by-topic bars (plain CSS width %, not SVG)
 ├── pages/
 │   ├── Home/Home.tsx
 │   ├── Documents/Documents.tsx
 │   ├── Study/Study.tsx
+│   ├── Progress/Progress.tsx
 │   ├── QuizSetup/QuizSetup.tsx
 │   ├── Quiz/Quiz.tsx
 │   └── Results/Results.tsx
@@ -51,14 +80,16 @@ frontend/src/
 │   ├── quizApi.ts            typed wrapper for quiz/question/result endpoints
 │   ├── courseApi.ts          typed wrapper for course/week endpoints
 │   ├── documentApi.ts        typed wrapper for document upload/list/delete/search
-│   └── studyApi.ts           typed wrapper for /api/study/chat
+│   ├── studyApi.ts           typed wrapper for /api/study/chat
+│   └── progressApi.ts        typed wrapper for /api/progress
 ├── types/
 │   ├── Question.ts
 │   ├── Quiz.ts
 │   ├── Result.ts             mirror the backend's Pydantic schemas field-for-field
 │   ├── Course.ts
 │   ├── Document.ts
-│   └── Study.ts
+│   ├── Study.ts
+│   └── Progress.ts
 └── hooks/
     └── useTimer.ts            countdown hook used by the Quiz page's exam timer
 ```
@@ -128,6 +159,21 @@ show an explicit amber banner explaining that generation isn't connected to a re
 the UI doesn't pretend the extractive fallback is a generated answer. Once Phase 4's stub is
 replaced with a real Claude call, that check simply stops matching and the banner disappears on
 its own; no frontend change needed.
+
+## How the Progress page works
+
+```text
+Progress
+  → getProgress()   GET /api/progress → { total_quizzes, average_score_percentage,
+                                           score_trend[], topic_accuracy[] }
+  → <ScoreTrendChart points={score_trend} />     one point per completed quiz, in order
+  → <TopicAccuracyBars data={topic_accuracy} />  one bar per topic with >=1 answered question
+```
+
+Both charts are hand-rolled (SVG for the line chart, plain divs with a CSS `width` percentage for
+the bars) rather than pulling in a charting library — the data shapes are simple enough
+(a handful of points, a handful of topics) that a dependency wasn't justified. If the data model
+grows richer (multiple courses, per-week breakdowns, date-range filtering), revisit that call.
 
 ## Local setup
 

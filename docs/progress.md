@@ -153,3 +153,43 @@ retrieval found the right chunk, the constructed prompt was correctly structured
 citations, and the response's `model` field honestly reported the stub; repeated the same
 question through the actual `/study` UI in the browser pane and confirmed the answer, sources,
 stub banner, and expandable prompt view all render correctly.
+
+---
+
+## Design pass — green/botanical theme, sidebar shell, Progress page
+
+Not a numbered roadmap phase — a visual redesign requested directly, using reference mockups
+(dashboard-with-sidebar layouts, and separate watercolor leaf/floral corner artwork) as style
+guides, plus one new page (`Progress`, which the roadmap's frontend structure names but no phase
+had built yet).
+
+**Built:**
+- A custom `leaf` green Tailwind color scale (`index.css`, via Tailwind v4's `@theme`), replacing
+  `indigo` for brand/interactive elements across every existing page; `stone` (warmer gray)
+  replaced `slate` for neutrals. `emerald` was kept, deliberately, only for correct/incorrect quiz
+  feedback, so brand color and semantic success color stay visually distinct
+- `components/common/LeafDecoration.tsx` — an original hand-drawn SVG (radial wash + layered leaf
+  silhouettes + veins, in the `leaf` palette) inspired by the reference watercolor images, not a
+  reuse of them — those were AI-generated mood-board images, not licensed assets to embed
+- `components/layout/Layout.tsx` rewritten from a simple top nav into a persistent left sidebar
+  (logo, icon+label nav via `lucide-react`, active-route highlighting, a `LeafDecoration` at its
+  foot) with a responsive fallback to a horizontal top bar below the `md` breakpoint
+- New `/progress` page + `GET /api/progress`: total quizzes, average score, a score-over-time
+  line/area chart, and accuracy-by-topic bars — both charts hand-rolled (SVG / CSS width%) rather
+  than adding a charting library, since the data is simple enough not to justify one
+- Home page redesigned with a leaf-decorated hero and a quick-link card grid to every other page
+
+**Known limitation (accepted, documented):** `GET /api/progress` aggregates across all completed
+quizzes with no course filter — `Quiz` has no direct course foreign key today, and there's only
+one course in the seed data, so adding that filter now would be speculative (see backend.md's
+Progress aggregation section for the exact join that would be needed later).
+
+**Verified:** full type-check clean; walked every page (Home, Documents, Study, Progress,
+QuizSetup, Quiz, Results) in the browser pane at both a mobile-width and a 1280px desktop
+viewport to confirm the sidebar/top-bar responsive switch and color theme render correctly;
+generated sample completed quizzes via `curl` to confirm the Progress page's charts render real
+aggregated data, not just an empty state. Hit and fixed one real bug along the way: adding
+`lucide-react` while the Vite dev server was already running left a stale dependency
+pre-bundle cache, causing an "Invalid hook call" runtime error on client-side navigation — fixed
+by clearing `node_modules/.vite` and restarting the dev server (a fresh browser tab was also
+needed, since the open tab had cached the broken module graph).

@@ -58,7 +58,7 @@ export function Quiz() {
   const answeredCount = Object.keys(answers).length
 
   if (error) return <p className="text-red-600">{error}</p>
-  if (!quiz || !current) return <p className="text-slate-500">Loading quiz…</p>
+  if (!quiz || !current) return <p className="text-stone-500">Loading quiz…</p>
 
   const selectAnswer = (option: AnswerOption) => {
     setAnswers((prev) => ({ ...prev, [current.question.id]: option }))
@@ -83,12 +83,12 @@ export function Quiz() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <div className="text-sm text-slate-500">
+        <div className="text-sm text-stone-500">
           Question {currentIndex + 1} of {questions.length} &middot; {answeredCount} answered
         </div>
         {secondsLeft !== null && (
           <div
-            className={`font-mono text-lg font-semibold ${secondsLeft <= 60 ? 'text-red-600' : 'text-slate-800'}`}
+            className={`font-mono text-lg font-semibold ${secondsLeft <= 60 ? 'text-red-600' : 'text-stone-800'}`}
           >
             {formatSeconds(secondsLeft)}
           </div>
@@ -106,10 +106,10 @@ export function Quiz() {
               onClick={() => setCurrentIndex(i)}
               className={`h-8 w-8 rounded text-sm font-medium border ${
                 isCurrent
-                  ? 'border-indigo-600 bg-indigo-600 text-white'
+                  ? 'border-leaf-600 bg-leaf-600 text-white'
                   : isAnswered
-                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
-                    : 'border-slate-300 bg-white text-slate-600'
+                    ? 'border-leaf-300 bg-leaf-50 text-leaf-700'
+                    : 'border-stone-300 bg-white text-stone-600'
               } ${isFlagged ? 'ring-2 ring-amber-400' : ''}`}
             >
               {i + 1}
@@ -118,15 +118,15 @@ export function Quiz() {
         })}
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-6">
+      <div className="rounded-lg border border-stone-200 bg-white p-6">
         <div className="flex items-start justify-between gap-4">
-          <p className="text-lg font-medium text-slate-900">{current.question.question_text}</p>
+          <p className="text-lg font-medium text-stone-900">{current.question.question_text}</p>
           <button
             onClick={toggleFlag}
             className={`shrink-0 rounded px-2 py-1 text-xs font-medium border ${
               flagged.has(current.question.id)
                 ? 'border-amber-400 bg-amber-50 text-amber-700'
-                : 'border-slate-300 text-slate-500'
+                : 'border-stone-300 text-stone-500'
             }`}
           >
             {flagged.has(current.question.id) ? 'Flagged' : 'Flag'}
@@ -139,8 +139,8 @@ export function Quiz() {
               key={key}
               className={`flex items-center gap-3 rounded-md border px-4 py-3 cursor-pointer ${
                 answers[current.question.id] === key
-                  ? 'border-indigo-500 bg-indigo-50'
-                  : 'border-slate-200 hover:bg-slate-50'
+                  ? 'border-leaf-500 bg-leaf-50'
+                  : 'border-stone-200 hover:bg-stone-50'
               }`}
             >
               <input
@@ -148,9 +148,9 @@ export function Quiz() {
                 name={`question-${current.question.id}`}
                 checked={answers[current.question.id] === key}
                 onChange={() => selectAnswer(key)}
-                className="accent-indigo-600"
+                className="accent-leaf-600"
               />
-              <span className="font-medium text-slate-500">{key}.</span>
+              <span className="font-medium text-stone-500">{key}.</span>
               <span>{text}</span>
             </label>
           ))}
@@ -161,7 +161,7 @@ export function Quiz() {
         <button
           onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
           disabled={currentIndex === 0}
-          className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium disabled:opacity-40"
+          className="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium disabled:opacity-40"
         >
           Previous
         </button>
@@ -169,7 +169,7 @@ export function Quiz() {
         {currentIndex < questions.length - 1 ? (
           <button
             onClick={() => setCurrentIndex((i) => Math.min(questions.length - 1, i + 1))}
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            className="rounded-md bg-leaf-600 px-4 py-2 text-sm font-medium text-white hover:bg-leaf-700"
           >
             Next
           </button>

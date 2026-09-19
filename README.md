@@ -30,6 +30,10 @@ API key/cost yet). See [docs/progress.md](docs/progress.md) for the full phase-b
   swapping in Claude Haiku 4.5 is a one-function change
 - Scanned/image-only pages are detected and skipped (not silently dropped) — OCR itself is a
   documented stub, not implemented yet
+- A **Progress** page (`/progress`, backed by `GET /api/progress`) charting quizzes completed,
+  average score, score over time, and accuracy by topic
+- A green/botanical design system (sidebar navigation, a custom `leaf` color palette, an original
+  hand-drawn leaf decoration) applied across every page
 
 **Not yet built** (see [docs/roadmap.md](docs/roadmap.md) for the phased plan): a real LLM call
 for generation, the agent system (Study/Quiz/Tutor/Exam/Evaluation/Analytics agents as a proper
@@ -39,7 +43,7 @@ orchestrated architecture), learning memory, adaptive difficulty, OCR, and the c
 
 | Layer    | Technology |
 | -------- | ---------- |
-| Frontend | React 19, TypeScript, Vite, React Router, Tailwind CSS v4, Axios |
+| Frontend | React 19, TypeScript, Vite, React Router, Tailwind CSS v4, lucide-react, Axios |
 | Backend  | Python, FastAPI, SQLAlchemy 2.0, Pydantic v2, pypdf, sentence-transformers |
 | Database | PostgreSQL 16 + pgvector (via Docker Compose) |
 

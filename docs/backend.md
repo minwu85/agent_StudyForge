@@ -45,12 +45,14 @@ backend/
 │   │   └── routes/
 │   │       ├── courses.py       GET /api/courses, GET /api/courses/{id}/weeks
 │   │       ├── documents.py     POST /api/documents/upload, GET/DELETE /api/documents(/{id}), POST /api/documents/search
+│   │       ├── progress.py      GET /api/progress
 │   │       ├── questions.py     GET /api/questions/topics
 │   │       ├── quizzes.py       POST/GET /api/quizzes, POST /api/quizzes/{id}/submit
 │   │       ├── results.py       GET /api/results/{id}, GET /api/results/{id}/review
 │   │       └── study.py         POST /api/study/chat
 │   ├── services/
 │   │   ├── document_service.py  upload_document (save file + run pipeline), list/get/delete, search_chunks
+│   │   ├── progress_service.py  get_progress: aggregates completed quizzes into trend + per-topic accuracy
 │   │   ├── quiz_service.py      create_quiz, get_quiz, submit_quiz (scoring logic lives here)
 │   │   ├── result_service.py    result_summary, review (read-only, post-submission)
 │   │   └── study_service.py     ask: retrieve → build prompt → generate → assemble response
@@ -73,6 +75,7 @@ backend/
 │   │   ├── course_repository.py     list_courses, get_by_id
 │   │   ├── week_repository.py       list_weeks_with_counts
 │   │   ├── document_repository.py   save, get_by_id, list_documents, delete
+│   │   ├── progress_repository.py   completed_quizzes, topic_correctness_rows
 │   │   ├── question_repository.py   list_topics, random_questions (topic/difficulty/week_ids)
 │   │   └── quiz_repository.py       save, get_by_id (with eager-loaded questions)
 │   ├── models/
@@ -85,6 +88,7 @@ backend/
 │   │   ├── document.py          DocumentPublic, ChunkSearchRequest, ChunkSearchResult
 │   │   ├── question.py          QuestionPublic (no answer), QuestionWithAnswer, TopicSummary
 │   │   ├── quiz.py               QuizCreateRequest, QuizPublic, QuizSubmitRequest
+│   │   ├── progress.py           ProgressSummary, ScoreTrendPoint, TopicAccuracy
 │   │   ├── result.py             ResultSummary, ReviewResponse
 │   │   └── study.py              StudyChatRequest, StudyChatResponse, SourceExcerpt
 │   └── database/
@@ -204,6 +208,17 @@ question" entry point other code should call — it's what `study_service` uses,
 `document_service.search_chunks` (the raw Phase 3 search endpoint) was refactored to use it too,
 so there's exactly one place that turns a question into ranked chunks.
 
+## Progress aggregation
+
+`GET /api/progress` aggregates every *completed* `Quiz`: `score_trend` is one point per quiz
+ordered by `completed_at` (for a line chart), and `topic_accuracy` groups every answered
+`QuizQuestion` by its `Question.topic` and computes a correct/total ratio. It intentionally has
+no `course_id` filter — `Quiz` has no direct course foreign key (a quiz is built from a
+`topic`/`week_ids`/`difficulty` filter, not tied to one course row), and since only one course
+exists in the seed data anyway, adding that filter now would be speculative. If multi-course
+support becomes real, this is the first place that will need a join through
+`QuizQuestion → Question → course_id` to scope correctly.
+
 ## Why answers are never sent to the client mid-quiz
 
 `QuestionPublic` (used while a quiz is `in_progress`) omits `correct_answer` and `explanation`.
@@ -230,6 +245,7 @@ frontend never computes or trusts a score itself.
 | GET    | `/api/results/{id}`           | Score summary                                         |
 | GET    | `/api/results/{id}/review`    | Per-question breakdown with correct answers + explanations |
 | POST   | `/api/study/chat`             | `{question, course_id, top_k?}` → retrieved sources + the constructed prompt + a (stubbed) answer |
+| GET    | `/api/progress`               | Completed-quiz count, average score, score-over-time trend, and accuracy by topic |
 
 Interactive docs: `http://localhost:8000/docs` (FastAPI's auto-generated Swagger UI) while the
 server is running.
