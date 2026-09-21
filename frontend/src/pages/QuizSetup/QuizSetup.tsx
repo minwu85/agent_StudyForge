@@ -1,11 +1,14 @@
+import { Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCourses, getWeeks } from '../../services/courseApi'
-import { createQuiz, getTopics } from '../../services/quizApi'
+import { createQuiz, generateQuestions, getTopics } from '../../services/quizApi'
 import type { CoursePublic, WeekSummary } from '../../types/Course'
 import type { Difficulty, TopicSummary } from '../../types/Question'
+import type { QuestionGenerationResponse } from '../../types/Quiz'
 
 const DIFFICULTIES: (Difficulty | 'any')[] = ['any', 'easy', 'medium', 'hard']
+const GENERATE_DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard']
 
 export function QuizSetup() {
   const navigate = useNavigate()
@@ -19,6 +22,18 @@ export function QuizSetup() {
   const [timeLimit, setTimeLimit] = useState<number | ''>(15)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const [genDifficulty, setGenDifficulty] = useState<Difficulty>('medium')
+  const [genCount, setGenCount] = useState(5)
+  const [genTopic, setGenTopic] = useState('')
+  const [generating, setGenerating] = useState(false)
+  const [genResult, setGenResult] = useState<QuestionGenerationResponse | null>(null)
+  const [genError, setGenError] = useState<string | null>(null)
+
+  function refreshTopicsAndWeeks(courseId: number) {
+    getTopics().then(setTopics).catch(() => undefined)
+    getWeeks(courseId).then(setWeeks).catch(() => undefined)
+  }
 
   useEffect(() => {
     getTopics()
@@ -72,12 +87,131 @@ export function QuizSetup() {
     }
   }
 
+  async function handleGenerate() {
+    if (!course) return
+    setGenerating(true)
+    setGenError(null)
+    setGenResult(null)
+    try {
+      const result = await generateQuestions({
+        course_id: course.id,
+        week_ids: selectedWeekIds.size > 0 ? Array.from(selectedWeekIds) : null,
+        topic: genTopic.trim() || null,
+        difficulty: genDifficulty,
+        question_count: genCount,
+      })
+      setGenResult(result)
+      if (result.accepted.length > 0) refreshTopicsAndWeeks(course.id)
+    } catch {
+      setGenError('Could not generate questions. Make sure the selected weeks have uploaded, processed documents.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   return (
     <div className="max-w-lg mx-auto">
       <h1 className="text-2xl font-bold text-stone-900 mb-1">Quiz Setup</h1>
       {course && <p className="text-sm text-stone-500 mb-6">{course.name}</p>}
 
       {error && <p className="mb-4 text-red-600 text-sm">{error}</p>}
+
+      <div className="mb-8 rounded-xl border border-leaf-200 bg-leaf-50 p-5">
+        <div className="flex items-center gap-2 mb-1">
+          <Sparkles className="h-4 w-4 text-leaf-700" />
+          <h2 className="font-semibold text-stone-900">Quiz Agent: generate questions</h2>
+        </div>
+        <p className="text-sm text-stone-600 mb-4">
+          Turns your uploaded documents into new questions for the weeks selected above (or all weeks, if
+          none are selected) — retrieval + rule-based evaluation run for real; generation itself is a local
+          stub until an LLM is wired up (see Study page).
+        </p>
+
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label className="block text-xs font-medium text-stone-700 mb-1">Difficulty</label>
+            <select
+              value={genDifficulty}
+              onChange={(e) => setGenDifficulty(e.target.value as Difficulty)}
+              className="w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm bg-white"
+            >
+              {GENERATE_DIFFICULTIES.map((d) => (
+                <option key={d} value={d}>
+                  {d[0].toUpperCase() + d.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-stone-700 mb-1">How many</label>
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={genCount}
+              onChange={(e) => setGenCount(Number(e.target.value))}
+              className="w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm bg-white"
+            />
+          </div>
+        </div>
+
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-stone-700 mb-1">Topic label (optional)</label>
+          <input
+            type="text"
+            value={genTopic}
+            onChange={(e) => setGenTopic(e.target.value)}
+            placeholder="Generated"
+            className="w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm bg-white"
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleGenerate}
+          disabled={generating || !course}
+          className="w-full rounded-lg bg-leaf-700 px-4 py-2 text-sm text-white font-medium hover:bg-leaf-800 disabled:opacity-50 transition-colors"
+        >
+          {generating ? 'Generating…' : 'Generate questions from my documents'}
+        </button>
+
+        {genError && <p className="mt-3 text-sm text-red-600">{genError}</p>}
+
+        {genResult && (
+          <div className="mt-4 text-sm">
+            <p className="font-medium text-stone-900">
+              {genResult.accepted.length} of {genResult.requested} requested question
+              {genResult.requested === 1 ? '' : 's'} accepted
+              {genResult.rejected.length > 0 && `, ${genResult.rejected.length} rejected`}.
+            </p>
+            {genResult.accepted.length > 0 && (
+              <ul className="mt-2 space-y-1 text-stone-700 list-disc list-inside">
+                {genResult.accepted.map((q) => (
+                  <li key={q.id}>{q.question_text}</li>
+                ))}
+              </ul>
+            )}
+            {genResult.rejected.length > 0 && (
+              <details className="mt-2 text-stone-500">
+                <summary className="cursor-pointer">Why some candidates were rejected</summary>
+                <ul className="mt-1 space-y-1 list-disc list-inside">
+                  {genResult.rejected.map((r, i) => (
+                    <li key={i}>
+                      {r.document_filename}
+                      {r.page_number ? ` (p.${r.page_number})` : ''}: {r.reason}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            {genResult.requested > 0 && genResult.accepted.length === 0 && genResult.rejected.length === 0 && (
+              <p className="mt-2 text-stone-500">
+                No processed documents found for the selected weeks — upload some on the Documents page first.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {weeks.length > 0 && (

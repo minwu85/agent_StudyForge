@@ -1,6 +1,12 @@
 import { api } from './api'
 import type { ResultSummary, ReviewResponse } from '../types/Result'
-import type { QuizCreateRequest, QuizPublic, QuizSubmitRequest } from '../types/Quiz'
+import type {
+  QuestionGenerationRequest,
+  QuestionGenerationResponse,
+  QuizCreateRequest,
+  QuizPublic,
+  QuizSubmitRequest,
+} from '../types/Quiz'
 import type { TopicSummary } from '../types/Question'
 
 export async function getTopics(): Promise<TopicSummary[]> {
@@ -10,6 +16,11 @@ export async function getTopics(): Promise<TopicSummary[]> {
 
 export async function createQuiz(request: QuizCreateRequest): Promise<QuizPublic> {
   const { data } = await api.post<QuizPublic>('/quizzes', request)
+  return data
+}
+
+export async function generateQuestions(request: QuestionGenerationRequest): Promise<QuestionGenerationResponse> {
+  const { data } = await api.post<QuestionGenerationResponse>('/quizzes/generate-questions', request)
   return data
 }
 

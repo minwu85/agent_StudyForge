@@ -5,14 +5,17 @@ AI-generated quizzes, exam simulations, and a personalised tutor. See
 [docs/roadmap.md](docs/roadmap.md) for the full long-term vision (agents, RAG, OCR, memory,
 adaptive learning); this README covers what's actually built right now.
 
-## Status: Phase 4 — RAG (generation stubbed)
+## Status: Phase 5 — Quiz Agent (generation stubbed)
 
-A working quiz app plus a full RAG pipeline: React frontend, FastAPI backend, PostgreSQL +
-pgvector. Questions belong to a course and a week; users can upload their own PDFs, which get
-extracted, chunked, embedded locally, and made semantically searchable; a `/study` page retrieves
-relevant material for a question and builds the exact grounded-answer prompt the roadmap
-describes — with the actual LLM call left as a clearly-labeled stub by choice, not oversight (no
-API key/cost yet). See [docs/progress.md](docs/progress.md) for the full phase-by-phase build log.
+A working quiz app plus a full RAG pipeline and a first agent: React frontend, FastAPI backend,
+PostgreSQL + pgvector. Questions belong to a course and a week; users can upload their own PDFs,
+which get extracted, chunked, embedded locally, and made semantically searchable; a `/study` page
+retrieves relevant material for a question and builds the exact grounded-answer prompt the
+roadmap describes; and the new Quiz Agent turns those same uploaded documents into new practice
+questions, running every candidate through a real rule-based evaluation step before storing it.
+The actual LLM calls (for study answers and for question generation) are left as clearly-labeled
+stubs by choice, not oversight (no API key/cost yet). See
+[docs/progress.md](docs/progress.md) for the full phase-by-phase build log.
 
 **Implemented:**
 - Course → Week → Question data model; quiz setup filtered by any combination of weeks
@@ -28,6 +31,12 @@ API key/cost yet). See [docs/progress.md](docs/progress.md) for the full phase-b
   UI. The actual generation step is a documented stub (returns the best-matching passage instead
   of a model-generated answer) so the pipeline is real end-to-end without incurring API cost;
   swapping in Claude Haiku 4.5 is a one-function change
+- **Quiz Agent**: generates multiple-choice questions from your uploaded documents
+  (`POST /api/quizzes/generate-questions`, and a panel on the Quiz Setup page) — real RAG
+  retrieval and a real rule-based Evaluation Agent (structure/duplicate/validity checks), with
+  question generation itself a local cloze-question stub (no LLM yet) that still produces
+  genuinely gradeable questions; accepted questions become ordinary `Question` rows, usable in any
+  quiz immediately
 - Scanned/image-only pages are detected and skipped (not silently dropped) — OCR itself is a
   documented stub, not implemented yet
 - A **Progress** page (`/progress`, backed by `GET /api/progress`) charting quizzes completed,
@@ -35,9 +44,9 @@ API key/cost yet). See [docs/progress.md](docs/progress.md) for the full phase-b
 - A green/botanical design system (sidebar navigation, a custom `leaf` color palette, an original
   hand-drawn leaf decoration) applied across every page
 
-**Not yet built** (see [docs/roadmap.md](docs/roadmap.md) for the phased plan): a real LLM call
-for generation, the agent system (Study/Quiz/Tutor/Exam/Evaluation/Analytics agents as a proper
-orchestrated architecture), learning memory, adaptive difficulty, OCR, and the coding sandbox.
+**Not yet built** (see [docs/roadmap.md](docs/roadmap.md) for the phased plan): real LLM calls for
+generation, the rest of the agent system (Tutor/Exam/Analytics agents, an orchestrator), learning
+memory, adaptive difficulty, LLM-based evaluation, OCR, and the coding sandbox.
 
 ## Tech stack (current)
 

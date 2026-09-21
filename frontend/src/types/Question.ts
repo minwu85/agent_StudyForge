@@ -15,6 +15,7 @@ export interface QuestionPublic {
 export interface QuestionWithAnswer extends QuestionPublic {
   correct_answer: AnswerOption
   explanation: string
+  source_document_id: number | null
 }
 
 export interface TopicSummary {

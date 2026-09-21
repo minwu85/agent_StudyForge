@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.models.question import AnswerOption, Difficulty
 from app.models.quiz import QuizStatus
-from app.schemas.question import QuestionPublic
+from app.schemas.question import QuestionPublic, QuestionWithAnswer
 
 
 class QuizCreateRequest(BaseModel):
@@ -13,6 +13,28 @@ class QuizCreateRequest(BaseModel):
     week_ids: list[int] | None = None
     question_count: int = 10
     time_limit_minutes: int | None = None
+
+
+class QuestionGenerationRequest(BaseModel):
+    course_id: int
+    week_ids: list[int] | None = None
+    topic: str | None = None
+    difficulty: Difficulty = Difficulty.MEDIUM
+    question_count: int = 5
+
+
+class RejectedCandidatePublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    document_filename: str
+    page_number: int | None
+    reason: str
+
+
+class QuestionGenerationResponse(BaseModel):
+    requested: int
+    accepted: list[QuestionWithAnswer]
+    rejected: list[RejectedCandidatePublic]
 
 
 class QuizQuestionPublic(BaseModel):

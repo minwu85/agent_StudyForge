@@ -21,6 +21,7 @@ class QuestionPublic(BaseModel):
 class QuestionWithAnswer(QuestionPublic):
     correct_answer: AnswerOption
     explanation: str
+    source_document_id: int | None = None
 
 
 class TopicSummary(BaseModel):

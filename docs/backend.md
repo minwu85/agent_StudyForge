@@ -1,9 +1,9 @@
 # Backend
 
 FastAPI + SQLAlchemy + PostgreSQL. This document describes what is actually implemented today
-(Phase 1 MVP + Phase 2 question database + Phase 3 document pipeline + Phase 4 RAG — see
-[roadmap.md](roadmap.md) for the full long-term plan, and [progress.md](progress.md) for the
-phase-by-phase build log).
+(Phase 1 MVP + Phase 2 question database + Phase 3 document pipeline + Phase 4 RAG + Phase 5 Quiz
+Agent — see [roadmap.md](roadmap.md) for the full long-term plan, and [progress.md](progress.md)
+for the phase-by-phase build log).
 
 ## Stack
 
@@ -47,13 +47,17 @@ backend/
 │   │       ├── documents.py     POST /api/documents/upload, GET/DELETE /api/documents(/{id}), POST /api/documents/search
 │   │       ├── progress.py      GET /api/progress
 │   │       ├── questions.py     GET /api/questions/topics
-│   │       ├── quizzes.py       POST/GET /api/quizzes, POST /api/quizzes/{id}/submit
+│   │       ├── quizzes.py       POST/GET /api/quizzes, POST /api/quizzes/{id}/submit, POST /api/quizzes/generate-questions
 │   │       ├── results.py       GET /api/results/{id}, GET /api/results/{id}/review
 │   │       └── study.py         POST /api/study/chat
+│   ├── agents/
+│   │   ├── quiz_agent.py        generate_questions: RAG chunks → cloze question candidates (stub, see
+│   │   │                          Phase 5 section below) → evaluation_agent → accepted Question rows
+│   │   └── evaluation_agent.py  evaluate_generated_question: rule-based checks (no LLM needed)
 │   ├── services/
 │   │   ├── document_service.py  upload_document (save file + run pipeline), list/get/delete, search_chunks
 │   │   ├── progress_service.py  get_progress: aggregates completed quizzes into trend + per-topic accuracy
-│   │   ├── quiz_service.py      create_quiz, get_quiz, submit_quiz (scoring logic lives here)
+│   │   ├── quiz_service.py      create_quiz, get_quiz, submit_quiz, generate_questions (Quiz Agent entry point)
 │   │   ├── result_service.py    result_summary, review (read-only, post-submission)
 │   │   └── study_service.py     ask: retrieve → build prompt → generate → assemble response
 │   ├── rag/
@@ -76,18 +80,19 @@ backend/
 │   │   ├── week_repository.py       list_weeks_with_counts
 │   │   ├── document_repository.py   save, get_by_id, list_documents, delete
 │   │   ├── progress_repository.py   completed_quizzes, topic_correctness_rows
-│   │   ├── question_repository.py   list_topics, random_questions (topic/difficulty/week_ids)
+│   │   ├── question_repository.py   list_topics, random_questions (topic/difficulty/week_ids), save_all
 │   │   └── quiz_repository.py       save, get_by_id (with eager-loaded questions)
 │   ├── models/
 │   │   ├── course.py            Course, Week
 │   │   ├── document.py          Document, DocumentStatus, DocumentChunk (with a pgvector column)
-│   │   ├── question.py          Question, Difficulty, AnswerOption
+│   │   ├── question.py          Question (incl. nullable source_document_id), Difficulty, AnswerOption
 │   │   └── quiz.py              Quiz, QuizQuestion, QuizStatus
 │   ├── schemas/
 │   │   ├── course.py            CoursePublic, WeekSummary
 │   │   ├── document.py          DocumentPublic, ChunkSearchRequest, ChunkSearchResult
 │   │   ├── question.py          QuestionPublic (no answer), QuestionWithAnswer, TopicSummary
-│   │   ├── quiz.py               QuizCreateRequest, QuizPublic, QuizSubmitRequest
+│   │   ├── quiz.py               QuizCreateRequest, QuizPublic, QuizSubmitRequest,
+│   │   │                          QuestionGenerationRequest, QuestionGenerationResponse
 │   │   ├── progress.py           ProgressSummary, ScoreTrendPoint, TopicAccuracy
 │   │   ├── result.py             ResultSummary, ReviewResponse
 │   │   └── study.py              StudyChatRequest, StudyChatResponse, SourceExcerpt
@@ -98,12 +103,14 @@ backend/
 └── requirements.txt
 ```
 
-Folders described in the roadmap that don't exist yet (`agents/`, `tools/`, `memory/`,
-`evaluation/`) are intentionally not scaffolded — they belong to later phases and would just be
-empty placeholders today. `study_service.py` is doing what the roadmap calls the "Study Agent"
-in miniature (retrieve → prompt → answer, no tool-calling or orchestration yet) — it lives in
-`services/` rather than a new `agents/` package until there's a second agent and an orchestrator
-to justify that structure (Phase 5+).
+Folders described in the roadmap that don't exist yet (`tools/`, `memory/`, `evaluation/`,
+`orchestrator.py`) are intentionally not scaffolded — they belong to later phases and would just
+be empty placeholders today. `agents/` now exists (Phase 5's Quiz Agent + Evaluation Agent), but
+there's still no orchestrator: each agent is called directly by the service that needs it
+(`quiz_service.generate_questions` calls `agents.quiz_agent` directly, `study_service.ask` does
+its own retrieve → prompt → generate without going through `agents/`). An orchestrator earns its
+place once there's more than one entry point deciding *which* agent to call for a given request
+(Phase 9, "Advanced Agent Infrastructure").
 
 ## Data model (Phase 1 + 2)
 
@@ -119,6 +126,9 @@ description       week_number              week_id → weeks.id             diff
                                             correct_answer (A-D)           status (in_progress/completed)     flagged
                                             explanation                    score (nullable)
                                             difficulty (easy/med/hard)     started_at / completed_at
+                                            source_document_id (nullable,
+                                              → documents.id, set for
+                                              Quiz Agent-generated questions)
                                             created_at
 ```
 
@@ -208,6 +218,56 @@ question" entry point other code should call — it's what `study_service` uses,
 `document_service.search_chunks` (the raw Phase 3 search endpoint) was refactored to use it too,
 so there's exactly one place that turns a question into ranked chunks.
 
+## Quiz Agent (Phase 5)
+
+```text
+POST /api/quizzes/generate-questions ({course_id, week_ids?, topic?, difficulty, question_count})
+        ↓
+quiz_service.generate_questions
+        ↓ agents.quiz_agent.generate_questions
+        │    1. select READY DocumentChunk rows for the course (+ week_ids filter, if given)
+        │    2. for each chunk: _build_cloze_question — the stubbed "generate question" step
+        │       (see below) — produces (question_text, four options, correct_answer) or None
+        │    3. every candidate → agents.evaluation_agent.evaluate_generated_question
+        │       (rule-based: four non-empty distinct options, answer must be one of them,
+        │        question must contain a blank, minimum length) → accept or reject
+        │    4. stop once `question_count` are accepted, or chunks run out
+        ↓ question_repository.save_all(accepted questions)
+        ↓
+QuestionGenerationResponse { requested, accepted[], rejected[] }
+```
+
+This is the roadmap's "Quiz Agent → RAG → Generate question → Evaluation Agent → Valid? → Store"
+pipeline (section 5.2), fully wired end-to-end — retrieval, evaluation, and storage are all real.
+
+**Question generation is a documented stub, for the same reason as Phase 4's `generate_answer`**:
+no LLM is connected yet (no API key/cost). Rather than a placeholder that does nothing useful,
+`_build_cloze_question` builds a real, working multiple-choice question directly from the
+student's own material with a local heuristic:
+
+1. Split a retrieved chunk into sentences; pick one long enough to be a meaningful question.
+2. Pick the longest non-stopword word in that sentence as the "answer" and blank it out
+   (`"... uses a *heap* to..." → "... uses a _____ to..."`).
+3. Draw three distractors from the pool of similarly-extracted terms across *all* selected
+   chunks (so distractors are plausible same-domain vocabulary, not random noise).
+
+This produces genuinely gradeable cloze questions without calling a model, and it exercises the
+real evaluation and storage steps — unlike Phase 4's stub, which just echoes a passage back.
+Swapping in a real LLM later is scoped to `_build_cloze_question`'s body only: everything around
+it (chunk selection, evaluation, storage, the API contract) stays the same.
+
+**Evaluation is rule-based, not LLM-based** (roadmap section 19's "Rule-based evaluation" layer):
+`evaluate_generated_question` checks structure only (four distinct non-empty options, a valid
+correct answer, a non-trivial question). It says nothing about whether the question is
+*pedagogically* good — that's the roadmap's "LLM evaluation" layer (question quality, ambiguity,
+difficulty), left for when a real model is wired up.
+
+**Generated questions are ordinary `Question` rows** — the only difference from hand-seeded ones
+is a populated `source_document_id` (nullable FK to `documents`), so accepted questions
+immediately show up in normal quiz creation (`POST /api/quizzes`) via the existing
+topic/difficulty/week filters; there's no separate "AI question" code path anywhere else in the
+app.
+
 ## Progress aggregation
 
 `GET /api/progress` aggregates every *completed* `Quiz`: `score_trend` is one point per quiz
@@ -240,6 +300,7 @@ frontend never computes or trusts a score itself.
 | POST   | `/api/documents/search`       | Semantic search: `{query, course_id?, top_k?}` → nearest chunks by cosine similarity, no LLM |
 | GET    | `/api/questions/topics`       | Topics with question counts + available difficulties |
 | POST   | `/api/quizzes`                | Create a quiz (random question selection by topic/difficulty/week_ids filters) |
+| POST   | `/api/quizzes/generate-questions` | Quiz Agent: `{course_id, week_ids?, topic?, difficulty, question_count}` → generates cloze questions from uploaded documents, runs them through the rule-based evaluation agent, stores accepted ones |
 | GET    | `/api/quizzes/{id}`           | Fetch a quiz (answers hidden until completed)         |
 | POST   | `/api/quizzes/{id}/submit`    | Submit answers, scores server-side, marks completed   |
 | GET    | `/api/results/{id}`           | Score summary                                         |

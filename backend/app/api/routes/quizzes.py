@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_db
-from app.schemas.quiz import QuizCreateRequest, QuizPublic, QuizSubmitRequest
+from app.schemas.quiz import QuestionGenerationRequest, QuestionGenerationResponse, QuizCreateRequest, QuizPublic, QuizSubmitRequest
 from app.services import quiz_service
 
 router = APIRouter(prefix="/api/quizzes", tags=["quizzes"])
@@ -11,6 +11,11 @@ router = APIRouter(prefix="/api/quizzes", tags=["quizzes"])
 @router.post("", response_model=QuizPublic)
 def create_quiz(request: QuizCreateRequest, db: Session = Depends(get_db)):
     return quiz_service.create_quiz(db, request)
+
+
+@router.post("/generate-questions", response_model=QuestionGenerationResponse)
+def generate_questions(request: QuestionGenerationRequest, db: Session = Depends(get_db)):
+    return quiz_service.generate_questions(db, request)
 
 
 @router.get("/{quiz_id}", response_model=QuizPublic)

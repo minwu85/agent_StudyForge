@@ -1,9 +1,9 @@
 # Frontend
 
 React + TypeScript, built with Vite. This document describes what is actually implemented today
-(Phase 1 MVP + Phase 2 question database + Phase 3 document pipeline + Phase 4 RAG, plus a
-design pass and a Progress page — see [roadmap.md](roadmap.md) for the full long-term plan, and
-[progress.md](progress.md) for the phase-by-phase build log).
+(Phase 1 MVP + Phase 2 question database + Phase 3 document pipeline + Phase 4 RAG + Phase 5 Quiz
+Agent, plus a design pass and a Progress page — see [roadmap.md](roadmap.md) for the full
+long-term plan, and [progress.md](progress.md) for the phase-by-phase build log).
 
 ## Stack
 
@@ -46,7 +46,8 @@ The UI uses a green/botanical theme rather than Tailwind's default palette:
                               see backend.md Phase 4)
 /progress       Progress     Quizzes completed, average score, a score-over-time chart, and
                               accuracy by topic
-/quiz/setup     QuizSetup    Pick weeks, topic, difficulty, question count, time limit → creates a quiz
+/quiz/setup     QuizSetup    Pick weeks, topic, difficulty, question count, time limit → creates a quiz;
+                              also hosts the Quiz Agent panel (generate questions from documents)
 /quiz/:quizId   Quiz         Exam-taking UI: timer, question nav grid, flagging, submit
 /results/:id    Results      Score summary + optional per-question review
 ```
@@ -77,7 +78,7 @@ frontend/src/
 │   └── Results/Results.tsx
 ├── services/
 │   ├── api.ts                axios instance (baseURL: /api)
-│   ├── quizApi.ts            typed wrapper for quiz/question/result endpoints
+│   ├── quizApi.ts            typed wrapper for quiz/question/result endpoints, incl. generateQuestions (Quiz Agent)
 │   ├── courseApi.ts          typed wrapper for course/week endpoints
 │   ├── documentApi.ts        typed wrapper for document upload/list/delete/search
 │   ├── studyApi.ts           typed wrapper for /api/study/chat
@@ -124,6 +125,30 @@ backend returns the authoritative score on submit.
 one — there's no course picker in the UI yet since the seed data only creates one course. The API
 (`GET /api/courses`) already supports more than one; adding a `<select>` when that becomes true
 is a small, isolated change rather than a redesign.
+
+## The Quiz Agent panel (on QuizSetup)
+
+A card above the manual quiz form, driven by its own local state (`genDifficulty`, `genCount`,
+`genTopic`, `genResult`) separate from the manual-quiz form fields:
+
+```text
+"Generate questions from my documents" button
+  → generateQuestions({ course_id, week_ids: <same checkbox selection as the form below>,
+                         topic: genTopic || null, difficulty: genDifficulty, question_count: genCount })
+  → POST /api/quizzes/generate-questions
+  → renders: "N of M requested questions accepted, R rejected"
+             + the accepted questions' text
+             + a collapsible list of why any candidates were rejected (per roadmap section 19 —
+               even a rejection should say *why*, not just fail silently)
+  → on success, re-fetches topics/weeks so the new questions' counts show up immediately in the
+    manual quiz form below
+```
+
+It reuses the same week checkboxes as the manual quiz-creation form below it (selecting weeks
+scopes both "which questions to build a quiz from" and "which documents to generate from"), but
+has its own difficulty/count fields, since generating 5 questions at hard difficulty and then
+taking a 10-question easy quiz from the resulting (mixed) bank is a reasonable, independent
+workflow.
 
 ## How the Documents page works
 

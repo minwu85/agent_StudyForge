@@ -37,3 +37,11 @@ def random_questions(
         query = query.where(Question.week_id.in_(week_ids))
     query = query.order_by(func.random()).limit(count)
     return db.execute(query).scalars().all()
+
+
+def save_all(db: Session, questions: list[Question]) -> list[Question]:
+    db.add_all(questions)
+    db.commit()
+    for question in questions:
+        db.refresh(question)
+    return questions

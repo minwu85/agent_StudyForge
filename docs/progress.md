@@ -11,7 +11,7 @@ verified. For current-state architecture docs (not a log), see [backend.md](back
 | 2 | Question Database | ✅ Done |
 | 3 | Document Pipeline | ✅ Done |
 | 4 | RAG | ⚠️ Done (generation stubbed) |
-| 5 | Quiz Agent | ⬜ Not started |
+| 5 | Quiz Agent | ⚠️ Done (question generation stubbed, locally) |
 | 6 | Tutor Agent | ⬜ Not started |
 | 7 | Personalised Memory | ⬜ Not started |
 | 8 | Automatic Evaluation | ⬜ Not started |
@@ -153,6 +153,57 @@ retrieval found the right chunk, the constructed prompt was correctly structured
 citations, and the response's `model` field honestly reported the stub; repeated the same
 question through the actual `/study` UI in the browser pane and confirmed the answer, sources,
 stub banner, and expandable prompt view all render correctly.
+
+---
+
+## Phase 5 — Quiz Agent ⚠️ (question generation stubbed, locally)
+
+Wires the roadmap's "Quiz Agent → RAG → Generate question → Evaluation Agent → Valid? →
+Store/Regenerate" pipeline (section 5.2) into a real, callable endpoint — students can turn their
+own uploaded documents into new practice questions, not just search or ask about them.
+
+**Decision (consistent with Phase 3/4's choices):** no LLM call for generation here either — same
+reasoning as Phase 4 (no API key/cost yet). Unlike Phase 4's stub, which just echoes a retrieved
+passage back, this one builds genuinely gradeable multiple-choice questions with a local
+heuristic (cloze/fill-in-the-blank: pick a distinctive term from a retrieved sentence, blank it,
+draw distractors from other terms in the same document set) — so the full pipeline, including the
+*real* rule-based evaluation step, has real work to do end-to-end.
+
+**Built:**
+- `app/agents/` — new package, matching the roadmap's structure:
+  - `evaluation_agent.py`: `evaluate_generated_question` — rule-based checks only (four distinct
+    non-empty options, correct answer must be one of them, question must contain a blank, minimum
+    length). This is the roadmap's "Rule-based evaluation" layer (section 19); the "LLM
+    evaluation" layer (ambiguity, quality, difficulty) is out of scope until a model is connected.
+  - `quiz_agent.py`: `generate_questions` — selects `READY` document chunks for the requested
+    course/weeks, builds a cloze-question candidate per chunk (`_build_cloze_question`, the
+    stubbed "generation" step), runs each through the evaluation agent, and returns accepted
+    `Question` rows plus a list of rejected candidates with reasons
+- `Question.source_document_id` — new nullable FK to `documents`, set only on Quiz Agent-generated
+  questions; hand-seeded questions leave it `NULL`. No other Question field changed, so generated
+  questions are ordinary rows that immediately work with existing quiz creation, filtering, and
+  scoring — no separate "AI question" code path
+- `POST /api/quizzes/generate-questions`: `{course_id, week_ids?, topic?, difficulty,
+  question_count}` → `{requested, accepted[], rejected[]}`
+- QuizSetup page gained a "Quiz Agent" panel above the manual quiz form: pick difficulty/count/an
+  optional topic label, reuses the same week checkboxes as the form below, generate, see accepted
+  questions' text plus a collapsible "why rejected" list per candidate, then use the manual form
+  below (now showing updated counts) to build a quiz that includes them
+
+**Known limitation (accepted, documented):** the cloze heuristic is intentionally simple — it
+doesn't understand meaning, so question quality varies with how well a given sentence's key term
+reads as a fill-in-the-blank. This is fine for demonstrating the full agent pipeline
+(retrieval → generation → evaluation → storage) without cost; swapping in a real LLM later only
+touches `_build_cloze_question`'s body, same pattern as Phase 4's `generate_answer`.
+
+**Verified:** uploaded a test PDF, generated questions via `curl` against
+`/api/quizzes/generate-questions` and confirmed accepted questions had four distinct options, a
+valid correct answer, and a populated `source_document_id`; confirmed a request for more questions
+than available chunks/distractors correctly returns fewer than requested with `rejected` reasons
+instead of erroring; confirmed accepted questions immediately appeared in `GET
+/api/quizzes/generate-questions`'s week/topic and were selectable through the normal `POST
+/api/quizzes` flow. Repeated the same generate → review → quiz flow through the actual QuizSetup
+UI in the browser pane.
 
 ---
 

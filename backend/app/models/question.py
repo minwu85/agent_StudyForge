@@ -9,6 +9,7 @@ from app.database.connection import Base
 
 if TYPE_CHECKING:
     from app.models.course import Course, Week
+    from app.models.document import Document
 
 
 class Difficulty(str, enum.Enum):
@@ -39,7 +40,9 @@ class Question(Base):
     correct_answer: Mapped[AnswerOption] = mapped_column(Enum(AnswerOption))
     explanation: Mapped[str] = mapped_column(Text)
     difficulty: Mapped[Difficulty] = mapped_column(Enum(Difficulty), index=True)
+    source_document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
 
     course: Mapped["Course"] = relationship()
     week: Mapped["Week"] = relationship()
+    source_document: Mapped["Document | None"] = relationship()

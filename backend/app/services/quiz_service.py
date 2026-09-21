@@ -3,9 +3,10 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.agents import quiz_agent
 from app.models.quiz import Quiz, QuizQuestion, QuizStatus
 from app.repositories import question_repository, quiz_repository
-from app.schemas.quiz import QuizCreateRequest, QuizSubmitRequest
+from app.schemas.quiz import QuestionGenerationRequest, QuestionGenerationResponse, QuizCreateRequest, QuizSubmitRequest
 
 
 def create_quiz(db: Session, request: QuizCreateRequest) -> Quiz:
@@ -32,6 +33,23 @@ def create_quiz(db: Session, request: QuizCreateRequest) -> Quiz:
         for index, question in enumerate(questions)
     ]
     return quiz_repository.save(db, quiz)
+
+
+def generate_questions(db: Session, request: QuestionGenerationRequest) -> QuestionGenerationResponse:
+    result = quiz_agent.generate_questions(
+        db,
+        course_id=request.course_id,
+        week_ids=request.week_ids,
+        topic=request.topic,
+        difficulty=request.difficulty,
+        question_count=request.question_count,
+    )
+    stored = question_repository.save_all(db, result.questions) if result.questions else []
+    return QuestionGenerationResponse(
+        requested=result.requested,
+        accepted=stored,
+        rejected=result.rejected,
+    )
 
 
 def get_quiz(db: Session, quiz_id: int) -> Quiz:
