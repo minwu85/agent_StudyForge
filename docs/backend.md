@@ -2,8 +2,8 @@
 
 FastAPI + SQLAlchemy + PostgreSQL. This document describes what is actually implemented today
 (Phase 1 MVP + Phase 2 question database + Phase 3 document pipeline + Phase 4 RAG + Phase 5 Quiz
-Agent — see [roadmap.md](roadmap.md) for the full long-term plan, and [progress.md](progress.md)
-for the phase-by-phase build log).
+Agent + Phase 6 Tutor Agent — see [roadmap.md](roadmap.md) for the full long-term plan, and
+[progress.md](progress.md) for the phase-by-phase build log).
 
 ## Stack
 
@@ -49,17 +49,21 @@ backend/
 │   │       ├── questions.py     GET /api/questions/topics
 │   │       ├── quizzes.py       POST/GET /api/quizzes, POST /api/quizzes/{id}/submit, POST /api/quizzes/generate-questions
 │   │       ├── results.py       GET /api/results/{id}, GET /api/results/{id}/review
-│   │       └── study.py         POST /api/study/chat
+│   │       ├── study.py         POST /api/study/chat
+│   │       └── tutor.py         POST /api/tutor/sessions, GET /api/tutor/sessions/{id}, POST .../answer, POST .../hint
 │   ├── agents/
 │   │   ├── quiz_agent.py        generate_questions: RAG chunks → cloze question candidates (stub, see
 │   │   │                          Phase 5 section below) → evaluation_agent → accepted Question rows
-│   │   └── evaluation_agent.py  evaluate_generated_question: rule-based checks (no LLM needed)
+│   │   ├── evaluation_agent.py  evaluate_generated_question: rule-based checks (no LLM needed)
+│   │   └── tutor_agent.py       generate_turn (reuses quiz_agent's chunk selection + cloze stub),
+│   │                              adapt_difficulty, build_hint — see Phase 6 section below
 │   ├── services/
 │   │   ├── document_service.py  upload_document (save file + run pipeline), list/get/delete, search_chunks
 │   │   ├── progress_service.py  get_progress: aggregates completed quizzes into trend + per-topic accuracy
 │   │   ├── quiz_service.py      create_quiz, get_quiz, submit_quiz, generate_questions (Quiz Agent entry point)
 │   │   ├── result_service.py    result_summary, review (read-only, post-submission)
-│   │   └── study_service.py     ask: retrieve → build prompt → generate → assemble response
+│   │   ├── study_service.py     ask: retrieve → build prompt → generate → assemble response
+│   │   └── tutor_service.py     create_session, get_session, submit_answer, get_hint (Tutor Agent entry point)
 │   ├── rag/
 │   │   ├── extractor.py         extract_pdf_pages: per-page text via pypdf, flags scanned pages
 │   │   ├── chunking.py          chunk_pages: ~800-char word-boundary chunks with ~150-char overlap
@@ -81,12 +85,14 @@ backend/
 │   │   ├── document_repository.py   save, get_by_id, list_documents, delete
 │   │   ├── progress_repository.py   completed_quizzes, topic_correctness_rows
 │   │   ├── question_repository.py   list_topics, random_questions (topic/difficulty/week_ids), save_all
-│   │   └── quiz_repository.py       save, get_by_id (with eager-loaded questions)
+│   │   ├── quiz_repository.py       save, get_by_id (with eager-loaded questions)
+│   │   └── tutor_repository.py      save, get_by_id (with eager-loaded turns), save_turn
 │   ├── models/
 │   │   ├── course.py            Course, Week
 │   │   ├── document.py          Document, DocumentStatus, DocumentChunk (with a pgvector column)
 │   │   ├── question.py          Question (incl. nullable source_document_id), Difficulty, AnswerOption
-│   │   └── quiz.py              Quiz, QuizQuestion, QuizStatus
+│   │   ├── quiz.py              Quiz, QuizQuestion, QuizStatus
+│   │   └── tutor.py             TutorSession, TutorSessionStatus, TutorTurn
 │   ├── schemas/
 │   │   ├── course.py            CoursePublic, WeekSummary
 │   │   ├── document.py          DocumentPublic, ChunkSearchRequest, ChunkSearchResult
@@ -95,7 +101,9 @@ backend/
 │   │   │                          QuestionGenerationRequest, QuestionGenerationResponse
 │   │   ├── progress.py           ProgressSummary, ScoreTrendPoint, TopicAccuracy
 │   │   ├── result.py             ResultSummary, ReviewResponse
-│   │   └── study.py              StudyChatRequest, StudyChatResponse, SourceExcerpt
+│   │   ├── study.py              StudyChatRequest, StudyChatResponse, SourceExcerpt
+│   │   └── tutor.py              TutorSessionCreateRequest, TutorSessionPublic, TutorTurnPublic,
+│   │                               TutorAnswerRequest, TutorAnswerResponse, TutorHintResponse
 │   └── database/
 │       ├── connection.py        SQLAlchemy engine/session, Base, get_db dependency
 │       └── seed.py              resets schema + storage, seeds 1 course, 5 weeks, 32 questions
@@ -105,12 +113,14 @@ backend/
 
 Folders described in the roadmap that don't exist yet (`tools/`, `memory/`, `evaluation/`,
 `orchestrator.py`) are intentionally not scaffolded — they belong to later phases and would just
-be empty placeholders today. `agents/` now exists (Phase 5's Quiz Agent + Evaluation Agent), but
+be empty placeholders today. `agents/` now holds three agents (Quiz, Evaluation, Tutor), but
 there's still no orchestrator: each agent is called directly by the service that needs it
-(`quiz_service.generate_questions` calls `agents.quiz_agent` directly, `study_service.ask` does
-its own retrieve → prompt → generate without going through `agents/`). An orchestrator earns its
-place once there's more than one entry point deciding *which* agent to call for a given request
-(Phase 9, "Advanced Agent Infrastructure").
+(`quiz_service.generate_questions` calls `agents.quiz_agent` directly, `tutor_service` calls
+`agents.tutor_agent` directly, `study_service.ask` does its own retrieve → prompt → generate
+without going through `agents/`). An orchestrator earns its place once there's more than one entry
+point deciding *which* agent to call for a given request (Phase 9, "Advanced Agent
+Infrastructure") — right now the frontend already knows which agent it wants (Study vs Quiz vs
+Tutor) by which page/button the student used, so there's no ambiguous request to route.
 
 ## Data model (Phase 1 + 2)
 
@@ -268,6 +278,65 @@ immediately show up in normal quiz creation (`POST /api/quizzes`) via the existi
 topic/difficulty/week filters; there's no separate "AI question" code path anywhere else in the
 app.
 
+## Tutor Agent (Phase 6)
+
+```text
+POST /api/tutor/sessions ({course_id, week_ids?, topic?})
+        ↓ tutor_service.create_session
+        ↓ agents.tutor_agent.generate_turn(course_id, week_ids, exclude_chunk_ids=[])
+        │    reuses quiz_agent's _select_chunks + _build_cloze_question + evaluation_agent —
+        │    a "turn" is one chunk's full, unblanked content (the explanation) plus a cloze
+        │    question built from a sentence inside it (the check question)
+        ↓ TutorSession created (difficulty starts at MEDIUM) with its first TutorTurn
+        ↓
+TutorSessionPublic { ..., turns: [ { explanation, question_text, option_a..d, ... } ] }
+        (no correct_answer in the response — hidden while a turn is unanswered, same principle as
+         QuestionPublic during a quiz)
+
+POST /api/tutor/sessions/{id}/answer ({selected_answer})
+        ↓ tutor_service.submit_answer
+        │    1. compare selected_answer to the current turn's stored correct_answer (rule-based,
+        │       no LLM — same spirit as evaluation_agent, applied to a student's answer)
+        │    2. update correct_streak / incorrect_streak / questions_asked / questions_correct
+        │    3. agents.tutor_agent.adapt_difficulty(difficulty, correct_streak, incorrect_streak)
+        │       — 2-in-a-row correct steps difficulty up, 2-in-a-row incorrect steps it down
+        │       (roadmap section 9's adaptive-learning example), resetting both streaks on a change
+        │    4. generate_turn again, excluding every chunk already used this session — appends a
+        │       new TutorTurn, or ends the session (status=ended) once material runs out
+        ↓
+TutorAnswerResponse { is_correct, correct_answer, previous_difficulty, new_difficulty,
+                      difficulty_changed, session: TutorSessionPublic }
+
+POST /api/tutor/sessions/{id}/hint
+        ↓ tutor_service.get_hint → agents.tutor_agent.build_hint(answer)
+        ↓ masks all but the first/last letter (e.g. "heap" → "h__p"); marks the turn hint_used
+```
+
+This is the roadmap's Tutor Agent loop (section 5.3: explain → question → evaluate → identify
+misunderstanding → hint → next question → adjust difficulty), and its adaptive-difficulty example
+(section 9) — both wired end-to-end without an LLM. **No new generation stub was needed**: the
+Tutor Agent doesn't call a model at all, even a stubbed one — it reuses Phase 5's cloze-question
+stub as-is (importing `quiz_agent._build_cloze_question` etc. directly, since both agents live in
+the same `agents/` package) and adds real, rule-based logic on top: streak tracking, difficulty
+adaptation, and answer checking. The "teaching" content itself (the `explanation` field) is simply
+the chunk's original, unmodified text — a real passage from the student's own material, not
+model-generated — so there's nothing to stub there either.
+
+**Why a `TutorTurn` table instead of reusing `Question`.** A turn needs fields a `Question` row
+doesn't: `student_answer`/`is_correct` (per-attempt, not shareable across students the way a quiz
+question bank is), `hint_used`, `turn_order`, and `difficulty_at_time` (so a session's history
+shows the difficulty *as it was* for each question, even after later turns raise or lower it).
+Turns aren't reused in quizzes and don't need topic/course-wide discoverability, so they don't
+need to be `Question` rows — they belong to exactly one `TutorSession` and nothing else.
+
+**Known limitation (accepted, documented):** the adaptive difficulty label doesn't actually change
+*which* chunks or sentences get picked — `generate_turn` selects from the same chunk pool
+regardless of the session's current difficulty (there's no notion of "this sentence is harder than
+that one" without an LLM to judge it). The difficulty value is tracked and surfaced honestly, and
+does correctly gate what gets written onto new `TutorTurn`/`Question` rows, but it's a label
+riding along the adaptive-learning *mechanism* rather than something that changes question
+selection yet — the same "real pipeline, stubbed intelligence" tradeoff as Phase 4 and 5.
+
 ## Progress aggregation
 
 `GET /api/progress` aggregates every *completed* `Quiz`: `score_trend` is one point per quiz
@@ -306,6 +375,10 @@ frontend never computes or trusts a score itself.
 | GET    | `/api/results/{id}`           | Score summary                                         |
 | GET    | `/api/results/{id}/review`    | Per-question breakdown with correct answers + explanations |
 | POST   | `/api/study/chat`             | `{question, course_id, top_k?}` → retrieved sources + the constructed prompt + a (stubbed) answer |
+| POST   | `/api/tutor/sessions`         | Tutor Agent: `{course_id, week_ids?, topic?}` → starts a session with its first explanation + question |
+| GET    | `/api/tutor/sessions/{id}`    | Fetch a tutor session (all turns so far, with answers hidden on the current unanswered one) |
+| POST   | `/api/tutor/sessions/{id}/answer` | `{selected_answer}` → correctness, updated difficulty, and the next turn (or session end) |
+| POST   | `/api/tutor/sessions/{id}/hint`   | Reveals a masked hint for the current unanswered turn                          |
 | GET    | `/api/progress`               | Completed-quiz count, average score, score-over-time trend, and accuracy by topic |
 
 Interactive docs: `http://localhost:8000/docs` (FastAPI's auto-generated Swagger UI) while the

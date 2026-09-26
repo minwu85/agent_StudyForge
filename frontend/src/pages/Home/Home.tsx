@@ -1,4 +1,4 @@
-import { BarChart3, ClipboardList, FileText, Sparkles } from 'lucide-react'
+import { BarChart3, ClipboardList, FileText, GraduationCap, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { LeafDecoration } from '../../components/common/LeafDecoration'
 
@@ -14,6 +14,12 @@ const QUICK_LINKS = [
     icon: Sparkles,
     title: 'Study',
     description: 'Ask a question and retrieve grounded material from your uploads.',
+  },
+  {
+    to: '/tutor',
+    icon: GraduationCap,
+    title: 'Tutor',
+    description: 'Work through your material passage-by-passage with adaptive difficulty.',
   },
   {
     to: '/quiz/setup',

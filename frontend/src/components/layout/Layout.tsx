@@ -1,4 +1,4 @@
-import { BarChart3, ClipboardList, FileText, Home as HomeIcon, Leaf, Sparkles } from 'lucide-react'
+import { BarChart3, ClipboardList, FileText, GraduationCap, Home as HomeIcon, Leaf, Sparkles } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { LeafDecoration } from '../common/LeafDecoration'
 
@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { to: '/', label: 'Home', icon: HomeIcon, end: true },
   { to: '/documents', label: 'Documents', icon: FileText, end: false },
   { to: '/study', label: 'Study', icon: Sparkles, end: false },
+  { to: '/tutor', label: 'Tutor', icon: GraduationCap, end: false },
   { to: '/quiz/setup', label: 'Quiz', icon: ClipboardList, end: false },
   { to: '/progress', label: 'Progress', icon: BarChart3, end: false },
 ] as const

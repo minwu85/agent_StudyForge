@@ -11,8 +11,8 @@ verified. For current-state architecture docs (not a log), see [backend.md](back
 | 2 | Question Database | ✅ Done |
 | 3 | Document Pipeline | ✅ Done |
 | 4 | RAG | ⚠️ Done (generation stubbed) |
-| 5 | Quiz Agent | ⚠️ Done (question generation stubbed, locally) |
-| 6 | Tutor Agent | ⬜ Not started |
+| 5 | Quiz Agent | 🔶 Code complete, not yet integration-tested (Docker Desktop startup issue) |
+| 6 | Tutor Agent | 🔶 Code complete, not yet integration-tested (Docker Desktop startup issue) |
 | 7 | Personalised Memory | ⬜ Not started |
 | 8 | Automatic Evaluation | ⬜ Not started |
 | 9 | Advanced Agent Infrastructure | ⬜ Not started |
@@ -156,7 +156,7 @@ stub banner, and expandable prompt view all render correctly.
 
 ---
 
-## Phase 5 — Quiz Agent ⚠️ (question generation stubbed, locally)
+## Phase 5 — Quiz Agent 🔶 (code complete, not yet integration-tested)
 
 Wires the roadmap's "Quiz Agent → RAG → Generate question → Evaluation Agent → Valid? →
 Store/Regenerate" pipeline (section 5.2) into a real, callable endpoint — students can turn their
@@ -196,14 +196,61 @@ reads as a fill-in-the-blank. This is fine for demonstrating the full agent pipe
 (retrieval → generation → evaluation → storage) without cost; swapping in a real LLM later only
 touches `_build_cloze_question`'s body, same pattern as Phase 4's `generate_answer`.
 
-**Verified:** uploaded a test PDF, generated questions via `curl` against
-`/api/quizzes/generate-questions` and confirmed accepted questions had four distinct options, a
-valid correct answer, and a populated `source_document_id`; confirmed a request for more questions
-than available chunks/distractors correctly returns fewer than requested with `rejected` reasons
-instead of erroring; confirmed accepted questions immediately appeared in `GET
-/api/quizzes/generate-questions`'s week/topic and were selectable through the normal `POST
-/api/quizzes` flow. Repeated the same generate → review → quiz flow through the actual QuizSetup
-UI in the browser pane.
+**Verification status:** the FastAPI app imports cleanly with the new route registered
+(`POST /api/quizzes/generate-questions`), and the frontend type-checks clean end-to-end, but this
+phase has **not yet been exercised against a live database** — Docker Desktop repeatedly failed to
+finish starting its WSL backend in this environment (see
+[docker-desktop-setup.md](docker-desktop-setup.md)'s troubleshooting section), so the
+upload-a-PDF → generate → verify-in-browser walkthrough used for every earlier phase couldn't be
+completed yet. This is flagged here deliberately rather than glossed over — treat Phase 5 as
+"code complete, integration-unverified" until this section is updated with real results.
+
+---
+
+## Phase 6 — Tutor Agent 🔶 (code complete, not yet integration-tested)
+
+Builds the roadmap's Tutor Agent loop (section 5.3: explain → question → evaluate → hint → next
+question → adjust difficulty) and its adaptive-difficulty example (section 9), on top of Phase 5's
+material rather than duplicating it.
+
+**Decision:** no new generation stub needed — the Tutor Agent doesn't call a model at all, even a
+stubbed one. It reuses Phase 5's cloze-question building block as-is (`quiz_agent._select_chunks`,
+`_build_cloze_question`) and layers genuinely real, rule-based logic on top: a turn's "explanation"
+is the student's own unmodified document text (nothing generated), the follow-up question is the
+same cloze mechanism Quiz Agent uses, answer-checking is a plain equality comparison, and
+difficulty adaptation is a deterministic streak-based rule — all real, none of it an LLM stand-in.
+
+**Built:**
+- `app/models/tutor.py`: `TutorSession` (course/weeks/topic, current `difficulty`, correct/incorrect
+  streak counters, running score, `used_chunk_ids` so a session never repeats a passage, `status`
+  active/ended) and `TutorTurn` (one explain+question step: explanation text, the four options,
+  correct answer, difficulty *at the time*, student's answer once given, `hint_used`)
+- `app/agents/tutor_agent.py`: `generate_turn` (picks an unused chunk, reuses Quiz Agent's cloze
+  builder + evaluation agent), `adapt_difficulty` (2-in-a-row correct → step up; 2-in-a-row
+  incorrect → step down; resets both streaks on a change — roadmap section 9's example, implemented
+  literally), `build_hint` (masks all but the first/last letter of the answer)
+- `app/services/tutor_service.py` + `app/repositories/tutor_repository.py`: session lifecycle —
+  `create_session` (first turn), `submit_answer` (score, adapt difficulty, generate the next turn or
+  end the session), `get_hint`
+- `POST /api/tutor/sessions`, `GET /api/tutor/sessions/{id}`, `POST .../answer`, `POST .../hint`
+- New `/tutor` page: pick weeks → start a session → read the passage → answer a 4-option question
+  (optionally request a hint first) → immediate inline feedback (correct option highlighted green,
+  a wrong pick highlighted red, matching the Quiz Results review convention) → Continue reveals the
+  next turn, which the backend already generated alongside the answer response → a "Session
+  complete" screen once the selected weeks' material is exhausted
+- Nav: a new "Tutor" sidebar/top-bar entry (`GraduationCap` icon) and Home page quick-link card
+
+**Known limitation (accepted, documented):** difficulty is tracked and surfaced honestly, and does
+gate the label written onto each turn, but doesn't yet change *which* chunk or sentence gets
+selected — there's no way to judge "this passage is harder than that one" without an LLM. Same
+"real pipeline, stubbed intelligence" tradeoff as Phases 4 and 5; see backend.md's Tutor Agent
+section for the exact reasoning.
+
+**Verification status:** same as Phase 5 — the backend imports cleanly with all four new routes
+registered, and the frontend type-checks clean, but this hasn't been walked through against a live
+database/browser yet for the same Docker Desktop startup reason. Update this section with real
+results (uploaded PDF → session → answer → difficulty change → hint → session end, verified via
+`curl` and in the browser) once Docker is confirmed running.
 
 ---
 

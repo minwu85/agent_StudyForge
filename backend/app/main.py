@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import courses, documents, progress, questions, quizzes, results, study
+from app.api.routes import courses, documents, progress, questions, quizzes, results, study, tutor
 from app.config import settings
 
 app = FastAPI(title="StudyForge API")
@@ -21,6 +21,7 @@ app.include_router(questions.router)
 app.include_router(quizzes.router)
 app.include_router(results.router)
 app.include_router(study.router)
+app.include_router(tutor.router)
 
 
 @app.get("/api/health")

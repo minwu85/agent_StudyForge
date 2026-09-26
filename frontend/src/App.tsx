@@ -7,6 +7,7 @@ import { Quiz } from './pages/Quiz/Quiz'
 import { QuizSetup } from './pages/QuizSetup/QuizSetup'
 import { Results } from './pages/Results/Results'
 import { Study } from './pages/Study/Study'
+import { Tutor } from './pages/Tutor/Tutor'
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/documents" element={<Documents />} />
           <Route path="/study" element={<Study />} />
+          <Route path="/tutor" element={<Tutor />} />
           <Route path="/progress" element={<Progress />} />
           <Route path="/quiz/setup" element={<QuizSetup />} />
           <Route path="/quiz/:quizId" element={<Quiz />} />

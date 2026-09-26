@@ -5,17 +5,19 @@ AI-generated quizzes, exam simulations, and a personalised tutor. See
 [docs/roadmap.md](docs/roadmap.md) for the full long-term vision (agents, RAG, OCR, memory,
 adaptive learning); this README covers what's actually built right now.
 
-## Status: Phase 5 — Quiz Agent (generation stubbed)
+## Status: Phase 6 — Tutor Agent (code complete; Quiz + Tutor agents pending integration test)
 
-A working quiz app plus a full RAG pipeline and a first agent: React frontend, FastAPI backend,
+A working quiz app, a full RAG pipeline, and two agents: React frontend, FastAPI backend,
 PostgreSQL + pgvector. Questions belong to a course and a week; users can upload their own PDFs,
 which get extracted, chunked, embedded locally, and made semantically searchable; a `/study` page
 retrieves relevant material for a question and builds the exact grounded-answer prompt the
-roadmap describes; and the new Quiz Agent turns those same uploaded documents into new practice
-questions, running every candidate through a real rule-based evaluation step before storing it.
-The actual LLM calls (for study answers and for question generation) are left as clearly-labeled
-stubs by choice, not oversight (no API key/cost yet). See
-[docs/progress.md](docs/progress.md) for the full phase-by-phase build log.
+roadmap describes; the Quiz Agent turns those same uploaded documents into new practice questions;
+and the Tutor Agent walks through material passage-by-passage with an explain → question →
+feedback → hint loop, adjusting difficulty from recent accuracy. The actual LLM calls (for study
+answers and for question generation) are left as clearly-labeled stubs by choice, not oversight
+(no API key/cost yet). **Phases 5 and 6 are code-complete and type-checked but not yet
+integration-tested against a live database** — see [docs/progress.md](docs/progress.md) for the
+full phase-by-phase build log and current verification status.
 
 **Implemented:**
 - Course → Week → Question data model; quiz setup filtered by any combination of weeks
@@ -37,6 +39,11 @@ stubs by choice, not oversight (no API key/cost yet). See
   question generation itself a local cloze-question stub (no LLM yet) that still produces
   genuinely gradeable questions; accepted questions become ordinary `Question` rows, usable in any
   quiz immediately
+- **Tutor Agent**: an adaptive explain → question → feedback loop (`/tutor` page,
+  `POST /api/tutor/sessions` + `.../answer` + `.../hint`) that shows a passage from your material,
+  checks understanding with a Quiz Agent-style question, and raises/lowers difficulty based on
+  your last two answers — real streak tracking and difficulty adaptation, no LLM involved anywhere
+  in this agent (the "explanation" is your own unmodified document text)
 - Scanned/image-only pages are detected and skipped (not silently dropped) — OCR itself is a
   documented stub, not implemented yet
 - A **Progress** page (`/progress`, backed by `GET /api/progress`) charting quizzes completed,
@@ -45,8 +52,8 @@ stubs by choice, not oversight (no API key/cost yet). See
   hand-drawn leaf decoration) applied across every page
 
 **Not yet built** (see [docs/roadmap.md](docs/roadmap.md) for the phased plan): real LLM calls for
-generation, the rest of the agent system (Tutor/Exam/Analytics agents, an orchestrator), learning
-memory, adaptive difficulty, LLM-based evaluation, OCR, and the coding sandbox.
+generation, the rest of the agent system (Exam/Analytics agents, an orchestrator), learning
+memory, content-aware difficulty selection, LLM-based evaluation, OCR, and the coding sandbox.
 
 ## Tech stack (current)
 

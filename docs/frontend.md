@@ -2,8 +2,9 @@
 
 React + TypeScript, built with Vite. This document describes what is actually implemented today
 (Phase 1 MVP + Phase 2 question database + Phase 3 document pipeline + Phase 4 RAG + Phase 5 Quiz
-Agent, plus a design pass and a Progress page — see [roadmap.md](roadmap.md) for the full
-long-term plan, and [progress.md](progress.md) for the phase-by-phase build log).
+Agent + Phase 6 Tutor Agent, plus a design pass and a Progress page — see
+[roadmap.md](roadmap.md) for the full long-term plan, and [progress.md](progress.md) for the
+phase-by-phase build log).
 
 ## Stack
 
@@ -44,6 +45,8 @@ The UI uses a green/botanical theme rather than Tailwind's default palette:
 /study          Study        Ask a question about your material; see retrieved sources + the
                               exact prompt that would be sent to an LLM (generation is stubbed —
                               see backend.md Phase 4)
+/tutor          Tutor        Adaptive explain → question → feedback loop over your material, with
+                              a hint button and difficulty that rises/falls with your accuracy
 /progress       Progress     Quizzes completed, average score, a score-over-time chart, and
                               accuracy by topic
 /quiz/setup     QuizSetup    Pick weeks, topic, difficulty, question count, time limit → creates a quiz;
@@ -72,6 +75,7 @@ frontend/src/
 │   ├── Home/Home.tsx
 │   ├── Documents/Documents.tsx
 │   ├── Study/Study.tsx
+│   ├── Tutor/Tutor.tsx
 │   ├── Progress/Progress.tsx
 │   ├── QuizSetup/QuizSetup.tsx
 │   ├── Quiz/Quiz.tsx
@@ -82,6 +86,7 @@ frontend/src/
 │   ├── courseApi.ts          typed wrapper for course/week endpoints
 │   ├── documentApi.ts        typed wrapper for document upload/list/delete/search
 │   ├── studyApi.ts           typed wrapper for /api/study/chat
+│   ├── tutorApi.ts           typed wrapper for /api/tutor/sessions (create/get/answer/hint)
 │   └── progressApi.ts        typed wrapper for /api/progress
 ├── types/
 │   ├── Question.ts
@@ -90,6 +95,7 @@ frontend/src/
 │   ├── Course.ts
 │   ├── Document.ts
 │   ├── Study.ts
+│   ├── Tutor.ts
 │   └── Progress.ts
 └── hooks/
     └── useTimer.ts            countdown hook used by the Quiz page's exam timer
@@ -184,6 +190,36 @@ show an explicit amber banner explaining that generation isn't connected to a re
 the UI doesn't pretend the extractive fallback is a generated answer. Once Phase 4's stub is
 replaced with a real Claude call, that check simply stops matching and the banner disappears on
 its own; no frontend change needed.
+
+## How the Tutor page works
+
+```text
+Tutor (before a session exists)
+  → getCourses() → getWeeks(courseId)   same week checkbox pattern as QuizSetup
+  → createTutorSession({ course_id, week_ids })   on "Start tutoring session"
+                                                   → POST /api/tutor/sessions
+
+Tutor (session active)
+  → local state: turnIndex (which of session.turns is on screen), selectedOption, result, hint
+  → turn = session.turns[turnIndex]   renders turn.explanation (the passage) above
+                                       turn.question_text + four option buttons
+  → submitTutorAnswer(session.id, { selected_answer })   on "Submit answer"
+                                                          → POST /api/tutor/sessions/{id}/answer
+                                                          → stores the response as `result` AND
+                                                            replaces `session` with response.session
+                                                            (which already includes the next turn,
+                                                            or is status=ended if material ran out)
+  → "Continue" button   increments turnIndex to reveal the next turn (already fetched — no extra
+                        request), and clears result/selectedOption/hint for the fresh question
+  → getTutorHint(session.id)   on "Get a hint" (only while the current turn is unanswered)
+                                → POST /api/tutor/sessions/{id}/hint → renders the masked answer
+```
+
+The answer buttons double as feedback once `result` is set: the correct option turns green, and a
+wrong selection turns red, using the same `is_correct`/`correct_answer` pattern as reviewing a quiz
+result — just inline instead of on a separate Results page, since a tutoring session is meant to
+give feedback immediately rather than at the end. A "Session complete" screen (no more turns
+returned) shows the running `questions_correct`/`questions_asked` tally and offers to start again.
 
 ## How the Progress page works
 
